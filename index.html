@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=13;
+var REAL_V=14;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3408,6 +3408,7 @@ function applyReal(p){
   if((p.realData||0)<11) applyReal11(p);
   if((p.realData||0)<12) applyReal12(p);
   if((p.realData||0)<13) applyReal13(p);
+  if((p.realData||0)<14) applyReal14(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3772,6 +3773,39 @@ function applyReal13(p){
   if(window.console) console.info("[real v13]",log);
 }
 
+/* REAL v14 · actualización del dueño (22-nov-2026, 18:46) · proyectos de INCOMELEC
+   - Completados: PRY-04 Unificación de diseño, PRY-05 Cartera recogida, PRY-06 Portales de área,
+     PRY-07 Informe de tareas (octubre y noviembre), PRY-08 Informe de gestión de Don José.
+   - PRY-16 Flujo de Caja: desarrollo al 90 %; quedan hechas las 3 primeras fases y falta la
+     entrega del HTML. Fecha de entrega 30-nov-2026 (igual su tarea vinculada).
+   - PRY-10 Formulario de contabilidad y PRY-11 Informes faltantes (I+D+i, Proyectos, IT):
+     siguen abiertos con fecha 30-nov-2026.
+   - Eliminados: PRY-09 Unificación y actualización de tareas de Don José (cancelado por el
+     cliente) y PRY-12 Creación del informe de ventas (y sus tareas vinculadas, si las hay).
+   Corre una sola vez (p.realData < 14). */
+var R14_TODAY="2026-11-22", R14_DUE="2026-11-30";
+function applyReal14(p){
+  var log=[], ts=Math.min(r7noon(R14_TODAY),Date.now());
+  p.projects=p.projects||[]; p.tasks=p.tasks||[];
+  function prj(id){ return p.projects.filter(function(x){return x.id===id&&x.cid==="incomelec";})[0]; }
+  function close(id){ var pr=prj(id); if(!pr) return;
+    (pr.areas||[]).forEach(function(a){ if(!a.done) a.done=R14_TODAY; });
+    if(pr.status!=="cerrado"){ pr.status="cerrado"; pr.closedAt=ts; }
+    log.push("completado · "+pr.name); }
+  ["x_PRY-04","x_PRY-05","x_PRY-06","x_PRY-07","x_PRY-08"].forEach(close);
+  var p7=prj("x_PRY-07"); if(p7&&/Octubre$/.test(p7.name)) p7.name=p7.name+" y Noviembre";
+  var f=prj("x_PRY-16");
+  if(f){ f.due=R14_DUE; (f.areas||[]).slice(0,3).forEach(function(a){ if(!a.done) a.done=R14_TODAY; });
+    if(String(f.notes||"").indexOf("90 %")<0) f.notes=(f.notes?f.notes+"\n":"")+"Avance real: 90 % desarrollado (22-nov-2026). Falta la entrega del HTML; entrega el 30-nov-2026.";
+    log.push("Flujo de Caja · 3 de 4 fases, entrega "+R14_DUE); }
+  ["x_PRY-10","x_PRY-11"].forEach(function(id){ var pr=prj(id); if(pr&&pr.status!=="cerrado"){ pr.due=R14_DUE; log.push("fecha "+R14_DUE+" · "+pr.name); } });
+  p.tasks.forEach(function(t){ if(t.pid==="x_PRY-16"&&t.status!=="done"){ t.due=R14_DUE; log.push("tarea · "+t.title+" → "+R14_DUE); } });
+  var del={"x_PRY-09":1,"x_PRY-12":1};
+  p.projects=p.projects.filter(function(x){ if(del[x.id]){ log.push("eliminado · "+x.name); return false; } return true; });
+  p.tasks=p.tasks.filter(function(t){ return !(t.pid&&del[t.pid]); });
+  if(window.console) console.info("[real v14]",log);
+}
+
 var DB=null, REV=0, saveTimer=null, storageErr=false;
 var BUILTIN={};
 (window.LIDATO_CLIENTS||[]).forEach(function(c){ BUILTIN[c.id]=c; });
@@ -4019,7 +4053,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<13){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<14){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
