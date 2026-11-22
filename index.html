@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=11;
+var REAL_V=12;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3406,6 +3406,7 @@ function applyReal(p){
   if((p.realData||0)<9) applyReal9(p);
   if((p.realData||0)<10) applyReal10(p);
   if((p.realData||0)<11) applyReal11(p);
+  if((p.realData||0)<12) applyReal12(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3725,6 +3726,22 @@ function applyReal11(p){
   if(window.console) console.info("[real v11]",log);
 }
 
+/* REAL v12 · actualización del dueño (22-nov-2026, 14:44)
+   Incomelec ($1.500.000/mes) y Andina ($700.000/mes) ya pagaron octubre y noviembre.
+   Se registran como recibidos a tiempo el día de pago pactado (15). Si ya existe un
+   pago de ese cliente para ese periodo, no se duplica. Corre una sola vez (p.realData < 12). */
+var R12_PAYS=[["incomelec",1500000],["andina",700000]], R12_KS=["2026-10","2026-11"];
+function applyReal12(p){
+  p.payments=p.payments||[]; var log=[];
+  R12_PAYS.forEach(function(X){ var cid=X[0], c=p.clients.filter(function(x){return x.id===cid;})[0]; if(!c) return;
+    R12_KS.forEach(function(k){
+      if(p.payments.some(function(y){return y.cid===cid&&y.period===k;})) return;
+      var d=monthDue(k,c.payDay||15);
+      p.payments.push({id:"pay_r12_"+cid+"_"+k.replace("-",""),createdAt:Date.now(),cid:cid,amount:X[1],date:d,period:k,kind:"recurrente",note:"Pago confirmado por el dueño (22-nov-2026)"});
+      log.push(cid+" · "+k+" · $"+X[1]+" · "+d); }); });
+  if(window.console) console.info("[real v12]",log);
+}
+
 var DB=null, REV=0, saveTimer=null, storageErr=false;
 var BUILTIN={};
 (window.LIDATO_CLIENTS||[]).forEach(function(c){ BUILTIN[c.id]=c; });
@@ -3972,7 +3989,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<11){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<12){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
