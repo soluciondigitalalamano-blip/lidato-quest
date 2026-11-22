@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=12;
+var REAL_V=13;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3407,6 +3407,7 @@ function applyReal(p){
   if((p.realData||0)<10) applyReal10(p);
   if((p.realData||0)<11) applyReal11(p);
   if((p.realData||0)<12) applyReal12(p);
+  if((p.realData||0)<13) applyReal13(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3742,6 +3743,35 @@ function applyReal12(p){
   if(window.console) console.info("[real v12]",log);
 }
 
+/* REAL v13 · actualización del dueño (22-nov-2026, 18:14)
+   Andina reprogramó para enero de 2027 la Implementación de Zoho Desk (PRY-01) y la
+   Capacitación de IA (PRY-02), con sus tareas. No cuentan en 2026: fechas a 31-ene-2027
+   y el "Avance de Implementación" de Andina se pausa en noviembre y diciembre de 2026
+   (se retoma en enero). El historial de octubre se conserva. Corre una sola vez (p.realData < 13). */
+var R13_DUE="2027-01-31", R13_NOTE="Reprogramado por Andina para enero de 2027 (22-nov-2026); no cuenta en 2026.";
+function applyReal13(p){
+  var log=[], c=p.clients.filter(function(x){return x.id==="andina";})[0];
+  if(!c) return;
+  var pids={};
+  (p.projects||[]).forEach(function(pr){
+    if(pr.cid!=="andina"||pr.status==="cerrado") return;
+    if(pr.id!=="x_PRY-01"&&pr.id!=="x_PRY-02"&&!/zoho|capacitaci[oó]n de ia/i.test(pr.name||"")) return;
+    pids[pr.id]=1; pr.due=R13_DUE;
+    if(String(pr.notes||"").indexOf(R13_NOTE)<0) pr.notes=(pr.notes?pr.notes+"\n":"")+R13_NOTE;
+    log.push("proyecto · "+pr.name+" → "+R13_DUE);
+  });
+  (p.tasks||[]).forEach(function(t){
+    if(t.status==="done") return;
+    var hit=(t.pid&&pids[t.pid])||(t.cid==="andina"&&/zoho desk|capacitaci[oó]n de ia/i.test(t.title||""));
+    if(!hit) return;
+    t.due=R13_DUE;
+    if(String(t.notes||"").indexOf(R13_NOTE)<0) t.notes=(t.notes?t.notes+"\n":"")+R13_NOTE;
+    log.push("tarea · "+t.title+" → "+R13_DUE);
+  });
+  if(c.impl||c.implEnd){ c.implPause=["2026-11","2026-12"]; log.push("Avance de Implementación de Andina en pausa nov–dic 2026"); }
+  if(window.console) console.info("[real v13]",log);
+}
+
 var DB=null, REV=0, saveTimer=null, storageErr=false;
 var BUILTIN={};
 (window.LIDATO_CLIENTS||[]).forEach(function(c){ BUILTIN[c.id]=c; });
@@ -3989,7 +4019,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<12){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<13){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
@@ -4173,7 +4203,7 @@ function tasksFor(c){
       if(it.until) o.until=it.until;
       out.push(o);
     });
-    if(c.impl||c.implEnd) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8,until:c.impl?null:c.implEnd});
+    if(c.impl||c.implEnd) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8,until:c.impl?null:c.implEnd,pause:c.implPause||null});
     return out;
   }
   if(R && R.daily) out.push({key:"rep_daily",cat:"informes",cadence:"daily",qty:R.daily.qty,
@@ -4193,12 +4223,12 @@ function tasksFor(c){
   }
   out.push({key:"revision",cat:"gestion",cadence:"monthly",qty:1,label:"Revisión Mensual con Cliente",sched:"reunión de cuenta",tag:"reunión",w:5});
   out.push({key:"oportunidad",cat:"gestion",cadence:"monthly",qty:1,label:"Registro de Tareas y Oportunidades",sched:"backlog del cliente",tag:"backlog",w:3});
-  if(c.impl||c.implEnd) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8,until:c.impl?null:c.implEnd});
+  if(c.impl||c.implEnd) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8,until:c.impl?null:c.implEnd,pause:c.implPause||null});
   return out;
 }
 var TPLC={};
 function tpls(cid,k){ if(!TPLC[cid]){ var c=client(cid); TPLC[cid]=c?tasksFor(c):[]; } var T=TPLC[cid]; if(!k) return T;
-  var m=+String(k).slice(5,7); return T.filter(function(t){ return (!t.months||t.months.indexOf(m)>=0)&&!(t.until&&k>t.until); }); }
+  var m=+String(k).slice(5,7); return T.filter(function(t){ return (!t.months||t.months.indexOf(m)>=0)&&!(t.until&&k>t.until)&&!(t.pause&&k>=t.pause[0]&&k<=t.pause[1]); }); }
 function tpl(cid,key){ var L=tpls(cid); for(var i=0;i<L.length;i++) if(L[i].key===key) return L[i]; return null; }
 function xpUnit(t){ return Math.round(6+(t.w||1)*4); }
 
