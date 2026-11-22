@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=10;
+var REAL_V=11;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3405,6 +3405,7 @@ function applyReal(p){
   if((p.realData||0)<8) applyReal8(p);
   if((p.realData||0)<9) applyReal9(p);
   if((p.realData||0)<10) applyReal10(p);
+  if((p.realData||0)<11) applyReal11(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3702,6 +3703,28 @@ function applyReal10(p){
   if(window.console) console.info("[real v10]",log);
 }
 
+/* REAL v11 · actualización del dueño (22-nov-2026, 14:39)
+   - Andina e Incomelec: los informes MENSUALES de noviembre ya están entregados, a tiempo.
+     (Andina: Grandes, Medianas y Pequeñas · Incomelec: mensuales por área.)
+   - Diarios y semanales de Incomelec hasta hoy ya quedaron en v10.
+   Se aplica una sola vez (p.realData < 11). */
+var R11_TODAY="2026-11-22", R11_K="2026-11";
+function applyReal11(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; var C=p.cycles[R11_K]=p.cycles[R11_K]||{}, mo=+R11_K.slice(5,7), log=[];
+  var ts=Math.min(r7noon(R11_TODAY),Date.now());
+  ["andina","incomelec"].forEach(function(cid){
+    var c=p.clients.filter(function(x){return x.id===cid;})[0]; if(!c||!Array.isArray(c.reportItems)) return;
+    c.reportItems.forEach(function(it){
+      if(it.cadence!=="monthly"||(it.months&&it.months.indexOf(mo)<0)||(it.until&&R11_K>it.until)) return;
+      var key="ri_"+it.id, id=cid+"|"+key, st=C[id]||{priority:null,notes:"",hrs:0};
+      st.count=it.qty; st.due=st.due||monthDue(R11_K,it.dom||null); C[id]=st;
+      for(var u=1;u<=it.qty;u++){ var ref="m|"+R11_K+"|"+cid+"|"+key+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:ts,late:false}; }
+      log.push(cid+" · "+it.id+" · "+it.label+" ("+it.qty+")");
+    });
+  });
+  if(window.console) console.info("[real v11]",log);
+}
+
 var DB=null, REV=0, saveTimer=null, storageErr=false;
 var BUILTIN={};
 (window.LIDATO_CLIENTS||[]).forEach(function(c){ BUILTIN[c.id]=c; });
@@ -3949,7 +3972,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<10){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<11){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
