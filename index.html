@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=14;
+var REAL_V=15;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3409,6 +3409,7 @@ function applyReal(p){
   if((p.realData||0)<12) applyReal12(p);
   if((p.realData||0)<13) applyReal13(p);
   if((p.realData||0)<14) applyReal14(p);
+  if((p.realData||0)<15) applyReal15(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3806,6 +3807,25 @@ function applyReal14(p){
   if(window.console) console.info("[real v14]",log);
 }
 
+/* REAL v15 · actualización del dueño (22-nov-2026, 18:55) · tareas de INCOMELEC
+   Entregadas a tiempo: "Nuevo informe de cobros y plan de gestión por áreas",
+   "Informe de tareas de todas las áreas" y "Adelantar todos los informes mensuales
+   atrasados". Se cierran con fecha de su vencimiento (a tiempo). "Flujo de Caja de
+   Incomelec" sigue abierta (entrega 30-nov-2026). Corre una sola vez (p.realData < 15). */
+var R15_DONE=[/^nuevo informe de cobros/i,/^informe de tareas de todas las [áa]reas/i,/^adelantar todos los informes mensuales/i];
+function applyReal15(p){
+  var log=[];
+  (p.tasks||[]).forEach(function(t){
+    if(t.cid!=="incomelec"||t.status==="done") return;
+    if(!R15_DONE.some(function(rx){return rx.test(t.title||"");})) return;
+    var d=t.due||"2026-11-22", ts=Math.min(r7noon(d),Date.now());
+    if(!t.createdAt||t.createdAt>ts-11*60000) t.createdAt=ts-24*3600000;
+    t.status="done"; t.doneAt=ts;
+    log.push("tarea a tiempo · "+t.title+" · "+d);
+  });
+  if(window.console) console.info("[real v15]",log);
+}
+
 var DB=null, REV=0, saveTimer=null, storageErr=false;
 var BUILTIN={};
 (window.LIDATO_CLIENTS||[]).forEach(function(c){ BUILTIN[c.id]=c; });
@@ -4053,7 +4073,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<14){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<15){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
