@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=9;
+var REAL_V=10;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3404,6 +3404,7 @@ function applyReal(p){
   if((p.realData||0)<7) applyReal7(p);
   if((p.realData||0)<8) applyReal8(p);
   if((p.realData||0)<9) applyReal9(p);
+  if((p.realData||0)<10) applyReal10(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3641,6 +3642,64 @@ function applyReal9(p){
     }
   }
   if(window.console) console.info("[real v9]",log);
+}
+
+/* REAL v10 · actualización del dueño (22-nov-2026, 14:33)
+   - Incomelec: todo entregado a tiempo hasta el 22-nov (tesorería diaria y semanales
+     de cartera, facturación y soporte), octubre y noviembre.
+   - Avance de Implementación de octubre de ambas: entregado a tiempo.
+   - Andina: ya no tiene semanales (Tareas y Proyectos terminan en octubre, que queda
+     completo); solo mensuales y los tres son cada mes: Grandes, Medianas y Pequeñas.
+     El historial de los semanales se conserva (until). De aquí en adelante, soporte.
+   Se aplica una sola vez (p.realData < 10). */
+var R10_TODAY="2026-11-22", R10_KS=["2026-10","2026-11"], R10_WEEKLY_END="2026-10";
+function applyReal10(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; var log=[], hol=(p.settings&&p.settings.holidays)? holidaysCO(2026) : {};
+  function cl(id){ return p.clients.filter(function(x){return x.id===id;})[0]; }
+  /* 1 · Andina: solo mensuales; los semanales terminan en octubre */
+  var a=cl("andina");
+  if(a&&Array.isArray(a.reportItems)){
+    a.reportItems.forEach(function(it){
+      if(it.cadence==="weekly"&&!it.until){ it.until=R10_WEEKLY_END; log.push("andina · "+it.id+" deja de ser semanal desde nov"); }
+      if(it.cadence==="monthly"&&it.months){ delete it.months; it.label=String(it.label).replace(/\s*\(trimestral\)/i,""); log.push("andina · "+it.id+" pasa a mensual"); }
+    });
+    var R=a.reports||{}, sum={daily:0,weekly:0,monthly:0};
+    a.reportItems.forEach(function(o){ if(!o.months&&!o.until) sum[o.cadence]+=o.qty; });
+    var rep={}; if(sum.daily) rep.daily={qty:sum.daily,time:R.daily&&R.daily.time||""};
+    if(sum.weekly) rep.weekly={qty:sum.weekly,dow:R.weekly&&R.weekly.dow!=null?R.weekly.dow:5,time:R.weekly&&R.weekly.time||""};
+    if(sum.monthly){ rep.monthly={qty:sum.monthly}; if(R.monthly&&R.monthly.dom) rep.monthly.dom=R.monthly.dom; }
+    a.reports=Object.keys(rep).length?rep:null;
+  }
+  /* 2 · todo lo vencido hasta hoy, a tiempo: Incomelec (diario + semanal) y Andina (semanal de octubre) */
+  [["incomelec",["daily","weekly"]],["andina",["weekly"]]].forEach(function(X){
+    var cid=X[0], c=cl(cid); if(!c||!Array.isArray(c.reportItems)) return;
+    c.reportItems.forEach(function(it){ if(X[1].indexOf(it.cadence)<0) return;
+      var key="ri_"+it.id, id=cid+"|"+key;
+      R10_KS.forEach(function(k){ if(it.until&&k>it.until) return; var C=p.cycles[k]=p.cycles[k]||{}, n=0;
+        if(it.cadence==="weekly"){
+          var W=weeksInMonth(k), st=C[id]||{priority:null,notes:"",hrs:0,slots:[]}; st.slots=st.slots||[];
+          while(st.slots.length<W) st.slots.push(0);
+          for(var i=0;i<W;i++){ var due=weekDue(k,i+1,it.dow==null?5:it.dow); if(due>R10_TODAY) continue;
+            if((st.slots[i]||0)<it.qty){ st.slots[i]=it.qty; n++; }
+            for(var u=1;u<=it.qty;u++){ var ref="w|"+k+"|"+cid+"|"+key+"|"+i+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:r7noon(due),late:false}; } }
+          C[id]=st; if(n) log.push(cid+" · "+it.id+" · "+k+" · "+n+" semana(s)");
+        } else {
+          var sd=C[id]||{priority:null,notes:"",hrs:0,d:{}}; sd.d=sd.d||{}; var last=daysInMonth(k);
+          for(var d=1; d<=last; d++){ var ds=k+"-"+(d<10?"0":"")+d; if(ds>R10_TODAY) break;
+            var w=parseISO(ds).getDay(); if(w===0||w===6||hol[ds]) continue;
+            if(!sd.d[ds]){ sd.d[ds]=true; n++; }
+            for(var u2=1;u2<=it.qty;u2++){ var r2="d|"+cid+"|"+key+"|"+ds+"|"+u2; if(!p.ev[r2]) p.ev[r2]={t:r7noon(ds),late:false}; } }
+          C[id]=sd; if(n) log.push(cid+" · "+it.id+" · "+k+" · "+n+" día(s)");
+        }
+      });
+    });
+  });
+  /* 3 · "Avance de Implementación" de octubre (venció el 31-oct): entregado a tiempo */
+  ["incomelec","andina"].forEach(function(cid){ var c=cl(cid); if(!c||!(c.impl||c.implEnd)) return;
+    var k=R10_KS[0], C=p.cycles[k]=p.cycles[k]||{}, id=cid+"|implement", st=C[id]||{priority:null,notes:"",hrs:0}, due=st.due||monthDue(k,null);
+    if(!(st.count>=1)){ st.count=1; log.push(cid+" · avance de implementación · "+k); } st.due=due; C[id]=st;
+    var ref="m|"+k+"|"+cid+"|implement|1"; if(!p.ev[ref]) p.ev[ref]={t:r7noon(due),late:false}; });
+  if(window.console) console.info("[real v10]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
@@ -3890,7 +3949,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<9){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<10){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
@@ -4071,6 +4130,7 @@ function tasksFor(c){
       if(it.cadence==="weekly"){ o.dow=it.dow==null?5:it.dow; o.sched=DOW[o.dow]; }
       if(it.cadence==="monthly"){ o.dom=it.dom||null; o.sched=(it.months?"trimestral (ene·abr·jul·oct) · ":"")+(it.dom?"día "+it.dom+" del mes":"cierre de mes"); }
       if(it.months) o.months=it.months.slice();
+      if(it.until) o.until=it.until;
       out.push(o);
     });
     if(c.impl||c.implEnd) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8,until:c.impl?null:c.implEnd});
