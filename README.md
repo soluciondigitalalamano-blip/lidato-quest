@@ -2,7 +2,7 @@
 
 Plataforma interna gamificada de Lidato para gestionar clientes, entregas, tareas y soporte.
 
-- Versión: v11 (octubre 2026)
+- Versión: v12 (noviembre 2026)
 - Archivo único: `index.html` (todo el código y los recursos van embebidos)
 - Publicación: GitHub Pages (rama `main`, carpeta raíz)
 

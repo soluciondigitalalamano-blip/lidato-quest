@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es" data-theme="emerald"><head>
 <meta charset="utf-8">
+<meta name="lidato-quest-version" content="v12 · noviembre">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0919">
 <title>LIDATO QUEST · Sala de mando</title>
@@ -3297,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=8;
+var REAL_V=9;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3402,6 +3403,7 @@ function applyReal(p){
   applyReal6(p);
   if((p.realData||0)<7) applyReal7(p);
   if((p.realData||0)<8) applyReal8(p);
+  if((p.realData||0)<9) applyReal9(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3597,6 +3599,48 @@ function applyReal8(p){
   R8_TICKETS.forEach(function(T){ if(have["x_"+T.id]) return; p.ticketSeq=(p.ticketSeq||0)+1;
     p.tickets.push({id:"x_"+T.id,n:p.ticketSeq,cid:c.id,subject:T.subject,detail:T.id+" · Shalom\nAcción: "+T.acc,
       priority:1,openedAt:opened,createdAt:Date.now(),status:"abierto",resolvedAt:null,hrs:0,resolution:""}); });
+}
+
+/* REAL v9 · actualización del dueño (22-nov-2026) · ciclo activo: noviembre
+   - Incomelec: TODOS los informes mensuales de octubre entregados a tiempo.
+   - Andina: TODOS los mensuales de octubre entregados (Grandes, Medianas y Pequeñas).
+   - Shalom: implementación entregada COMPLETA. Fases de sus proyectos al 100 %,
+     proyectos cerrados y tareas abiertas completadas. La implementación termina
+     en noviembre (implEnd): ese mes cuenta su "Avance de Implementación" y desde
+     diciembre ya no se pide. El historial de meses anteriores se conserva.
+   No toca pagos ni pipeline. Se aplica una sola vez (p.realData < 9). */
+var R9_TODAY="2026-11-22", R9_K="2026-10", R9_NOW_K="2026-11";
+var R9_MONTHLY=["incomelec","andina"];
+function applyReal9(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; var C=p.cycles[R9_K]=p.cycles[R9_K]||{}, mo=+R9_K.slice(5,7), log=[];
+  /* 1 · mensuales de octubre: Incomelec y Andina */
+  R9_MONTHLY.forEach(function(cid){
+    var c=p.clients.filter(function(x){return x.id===cid;})[0]; if(!c||!Array.isArray(c.reportItems)) return;
+    c.reportItems.forEach(function(it){
+      if(it.cadence!=="monthly"||(it.months&&it.months.indexOf(mo)<0)) return;
+      var key="ri_"+it.id, id=cid+"|"+key, st=C[id]||{priority:null,notes:"",hrs:0}, due=st.due||monthDue(R9_K,it.dom||null);
+      st.count=it.qty; st.due=due; C[id]=st;
+      for(var u=1;u<=it.qty;u++){ var ref="m|"+R9_K+"|"+cid+"|"+key+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:r7noon(due),late:false}; }
+      log.push(cid+" · "+it.id+" · "+it.label+" ("+it.qty+")");
+    });
+  });
+  /* 2 · Shalom: implementación completa */
+  var s=p.clients.filter(function(x){return x.id==="shalom";})[0]||p.clients.filter(function(x){return /shalom/i.test(x.name||"");})[0];
+  if(s){
+    var ts=Math.min(r7noon(R9_TODAY),Date.now()), pids={};
+    (p.projects||[]).forEach(function(pr){ if(pr.cid!==s.id) return; pids[pr.id]=1;
+      (pr.areas||[]).forEach(function(a){ if(!a.done){ a.done=R9_TODAY; log.push("shalom · fase · "+pr.name+" · "+a.name); } });
+      if(pr.status!=="cerrado"){ pr.status="cerrado"; pr.closedAt=ts; log.push("shalom · proyecto cerrado · "+pr.name); } });
+    (p.tasks||[]).forEach(function(t){ if((t.cid===s.id||(t.pid&&pids[t.pid]))&&t.status!=="done"){ t.status="done"; t.doneAt=ts; log.push("shalom · tarea · "+t.title); } });
+    if(s.impl||!s.implEnd){
+      s.impl=false; s.implEnd=R9_NOW_K;
+      var N=p.cycles[R9_NOW_K]=p.cycles[R9_NOW_K]||{}, sid=s.id+"|implement", sn=N[sid]||{priority:null,notes:"",hrs:0};
+      sn.count=1; sn.due=sn.due||monthDue(R9_NOW_K,null); N[sid]=sn;
+      var ref9="m|"+R9_NOW_K+"|"+s.id+"|implement|1"; if(!p.ev[ref9]) p.ev[ref9]={t:ts,late:false};
+      log.push("shalom · implementación terminada ("+R9_NOW_K+")");
+    }
+  }
+  if(window.console) console.info("[real v9]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
@@ -3846,7 +3890,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<8){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<9){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
@@ -4029,7 +4073,7 @@ function tasksFor(c){
       if(it.months) o.months=it.months.slice();
       out.push(o);
     });
-    if(c.impl) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8});
+    if(c.impl||c.implEnd) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8,until:c.impl?null:c.implEnd});
     return out;
   }
   if(R && R.daily) out.push({key:"rep_daily",cat:"informes",cadence:"daily",qty:R.daily.qty,
@@ -4049,12 +4093,12 @@ function tasksFor(c){
   }
   out.push({key:"revision",cat:"gestion",cadence:"monthly",qty:1,label:"Revisión Mensual con Cliente",sched:"reunión de cuenta",tag:"reunión",w:5});
   out.push({key:"oportunidad",cat:"gestion",cadence:"monthly",qty:1,label:"Registro de Tareas y Oportunidades",sched:"backlog del cliente",tag:"backlog",w:3});
-  if(c.impl) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8});
+  if(c.impl||c.implEnd) out.push({key:"implement",cat:"impl",cadence:"monthly",qty:1,label:"Avance de Implementación",sched:"proyecto en curso",tag:"proyecto",w:8,until:c.impl?null:c.implEnd});
   return out;
 }
 var TPLC={};
 function tpls(cid,k){ if(!TPLC[cid]){ var c=client(cid); TPLC[cid]=c?tasksFor(c):[]; } var T=TPLC[cid]; if(!k) return T;
-  var m=+String(k).slice(5,7); return T.filter(function(t){ return !t.months||t.months.indexOf(m)>=0; }); }
+  var m=+String(k).slice(5,7); return T.filter(function(t){ return (!t.months||t.months.indexOf(m)>=0)&&!(t.until&&k>t.until); }); }
 function tpl(cid,key){ var L=tpls(cid); for(var i=0;i<L.length;i++) if(L[i].key===key) return L[i]; return null; }
 function xpUnit(t){ return Math.round(6+(t.w||1)*4); }
 
