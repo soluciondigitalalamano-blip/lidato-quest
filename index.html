@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=17;
+var REAL_V=18;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3412,6 +3412,7 @@ function applyReal(p){
   if((p.realData||0)<15) applyReal15(p);
   if((p.realData||0)<16) applyReal16(p);
   if((p.realData||0)<17) applyReal17(p);
+  if((p.realData||0)<18) applyReal18(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3472,7 +3473,7 @@ var R4_PROJECTS=[
 ];
 var R4_TICKETS=[
   {id:"SOP-01",cid:"andina",subject:"Crear empresa Dorada",cat:"Configuración / Estructura",imp:"Estructura multi-empresa en sistema",acc:"Dar de alta y configurar la entidad Dorada con accesos y plantillas"},
-  {id:"SOP-02",cid:"andina",subject:"Pedir funciones de administración y hacer indicadores para informe semanal",cat:"Indicadores / Gestión",imp:"Informe Semanal de Administración",acc:"Solicitar listado de funciones y diseñar KPIs por persona"},
+  /* SOP-02 eliminado en v18: solicitud cancelada por el cliente */
   {id:"SOP-03",cid:"gymshop",subject:"Configurar usuario de Compensar para visualización global de tickets",cat:"Permisos / Mesa de Ayuda",imp:"Sistema de Tickets / Zoho Desk",acc:"Ajustar permisos de rol para visualización de tickets globales"},
   {id:"SOP-04",cid:"incomelec",subject:"Creación y configuración de usuario para nueva persona en Ventas",cat:"Accesos / Usuarios",imp:"Plataforma de Ventas / CRM",acc:"Configurar accesos y permisos para el nuevo colaborador de ventas"}
 ];
@@ -3862,6 +3863,12 @@ function applyReal17(p){
     if(pr.status!=="cerrado"){ pr.status="cerrado"; pr.closedAt=Date.now(); log.push("proyecto cerrado · "+pr.name); }
   });
   if(window.console) console.info("[real v17]",log);
+}
+function applyReal18(p){
+  /* eliminar ticket SOP-02 de Andina: solicitud cancelada por el cliente */
+  p.tickets=(p.tickets||[]).filter(function(t){ return t.id!=="x_SOP-02"; });
+  p.realData=18;
+  if(window.console) console.info("[real v18] eliminado SOP-02 (Pedir funciones de administración)");
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
