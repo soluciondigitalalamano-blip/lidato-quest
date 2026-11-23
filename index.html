@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=19;
+var REAL_V=20;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3413,6 +3413,7 @@ function applyReal(p){
   if((p.realData||0)<17) applyReal17(p);
   if((p.realData||0)<18) applyReal18(p);
   if((p.realData||0)<19) applyReal19(p);
+  if((p.realData||0)<20) applyReal20(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3891,6 +3892,134 @@ function applyReal19(p){
   });
   p.realData=19;
   if(window.console) console.info("[real v19] producción diaria desactivada");
+}
+
+/* REAL v20 · actualización de tres clientes (22-nov-2026)
+   Sign Supply (PRY-15): renombrar proyecto, marcar TH y Sistemas entregados,
+     urgentes para resolver correo / nueva propuesta / cronograma, nuevas tareas CRM.
+   San Fernando (PRY-13): actualizar portal TH (sep–nov done, dic pendiente),
+     mantener Jurídica y Ocupación pendientes.
+   Shalom (PRY-14): reabrir proyecto para nuevas tareas post-implementación;
+     marcar tareas históricas done, agregar Pruebas de informes e Implementación SW. */
+function applyReal20(p){
+  var ts=Math.min(r7noon(R14_TODAY),Date.now()), log=[];
+
+  /* ── 1. SIGN SUPPLY (PRY-15) ── */
+  var prSS=null;
+  (p.projects||[]).forEach(function(pr){
+    if(pr.id==="x_PRY-15"){ prSS=pr; }
+  });
+  if(prSS){
+    /* renombrar: quitar "y Propuesta de Informes" */
+    prSS.name="Implementación de Notion";
+    log.push("sign_supply · proyecto renombrado a: "+prSS.name);
+
+    /* marcar áreas entregadas: Talento Humano (index 0) y Sistemas (index 3) */
+    (prSS.areas||[]).forEach(function(a){
+      if(/Talento/i.test(a.name) || /Sistemas/i.test(a.name)){
+        if(!a.done){ a.done=R14_TODAY; log.push("sign_supply · área entregada · "+a.name); }
+      }
+    });
+
+    /* marcar tareas "Resolver puntos pendientes del correo", "Crear nueva propuesta de informes",
+       "Elaborar cronograma de terminación" como urgentes (pri:0) — son áreas del proyecto que ya
+       estaban como tareas */
+    (p.tasks||[]).forEach(function(t){
+      if(t.cid==="sign_supply" || (t.pid && t.pid==="x_PRY-15")){
+        if(/Resolver puntos pendientes/i.test(t.title)) t.priority=0;
+        if(/Crear nueva propuesta/i.test(t.title)) t.priority=0;
+        if(/Elaborar cronograma/i.test(t.title)) t.priority=0;
+      }
+    });
+
+    /* nuevas tareas */
+    p.tasks.push({id:uid("t_"),createdAt:ts,status:"todo",doneAt:null,hrs:0,
+      cid:"sign_supply",pid:"x_PRY-15",due:R14_DUE,priority:1,est:0,
+      title:"Creación de versión 2 de CRM",notes:"",real:true});
+    p.tasks.push({id:uid("t_"),createdAt:ts,status:"todo",doneAt:null,hrs:0,
+      cid:"sign_supply",pid:"x_PRY-15",due:R14_DUE,priority:1,est:0,
+      title:"Dejar plantilla lista del CRM noviembre y diciembre",notes:"",real:true});
+    log.push("sign_supply · 2 nuevas tareas CRM");
+
+    /* tickets: limpiar tickets de sign_supply */
+    (p.tickets||[]).forEach(function(tk){
+      if(tk.cid==="sign_supply" && tk.status!=="cerrado"){
+        tk.status="cerrado"; tk.closedAt=ts;
+      }
+    });
+    log.push("sign_supply · tickets cerrados");
+  }
+
+  /* ── 2. SAN FERNANDO PLAZA (PRY-13) ── */
+  var prSF=null;
+  (p.projects||[]).forEach(function(pr){
+    if(pr.id==="x_PRY-13"){ prSF=pr; }
+  });
+  if(prSF){
+    /* marcar "Terminar área de Talento Humano" como done */
+    (prSF.areas||[]).forEach(function(a){
+      if(/Terminar.*Talento/i.test(a.name) && !a.done){
+        a.done=R14_TODAY; log.push("san_fernando · área done · "+a.name);
+      }
+      /* marcar "Actualizar portal TH con datos de septiembre" como done */
+      if(/Actualizar.*portal.*septiembre/i.test(a.name) && !a.done){
+        a.done=R14_TODAY; log.push("san_fernando · área done · "+a.name);
+      }
+    });
+
+    /* agregar áreas nuevas para portal TH: octubre (done), noviembre (done), diciembre 5 (pendiente) */
+    var sfAreas=prSF.areas||[];
+    var baseId="aPRY13_";
+    sfAreas.push({id:baseId+"th_oct", name:"Actualizar portal TH con datos de octubre", done:R14_TODAY, hrs:0, hist:true});
+    sfAreas.push({id:baseId+"th_nov", name:"Actualizar portal TH con datos de noviembre", done:R14_TODAY, hrs:0, hist:true});
+    sfAreas.push({id:baseId+"th_dic", name:"Actualizar portal TH con datos de diciembre (5 dic)", done:null, hrs:0});
+    log.push("san_fernando · portal TH: oct y nov done, dic pendiente");
+
+    /* Jurídica y Ocupación se mantienen pendientes (ya están en las áreas originales) */
+
+    /* agregar tarea: terminar de implementar Jurídica y Ocupación */
+    p.tasks.push({id:uid("t_"),createdAt:ts,status:"todo",doneAt:null,hrs:0,
+      cid:"san_fernando",pid:"x_PRY-13",due:R14_DUE,priority:1,est:0,
+      title:"Terminar de implementar áreas Jurídica y Ocupación",notes:"",real:true});
+    log.push("san_fernando · nueva tarea implementar Jurídica y Ocupación");
+  }
+
+  /* ── 3. SHALOM (PRY-14) ── */
+  /* R9 ya cerró el proyecto y todas las tareas. Ahora hay tareas nuevas post-impl.
+     Marcamos como done las que el usuario confirmó y agregamos las nuevas. */
+  var shalom=p.clients?p.clients.filter(function(x){return x.id==="shalom";})[0]:null;
+  if(shalom){
+    /* Marcar tareas específicas como done (por si R9 no las cubrió todas o si se
+       re-crearon después). Las que el usuario listó: */
+    var shalomDonePatterns=[
+      /Registro de tareas faltantes/i,
+      /Revisión de las empresas que se enviaron/i,
+      /Creación de las tareas/i
+    ];
+    (p.tasks||[]).forEach(function(t){
+      if(t.cid==="shalom" && t.status!=="done"){
+        for(var i=0;i<shalomDonePatterns.length;i++){
+          if(shalomDonePatterns[i].test(t.title)){
+            t.status="done"; t.doneAt=ts;
+            log.push("shalom · tarea done · "+t.title);
+            break;
+          }
+        }
+      }
+    });
+
+    /* nuevas tareas */
+    p.tasks.push({id:uid("t_"),createdAt:ts,status:"todo",doneAt:null,hrs:0,
+      cid:"shalom",pid:null,due:R14_DUE,priority:0,est:0,
+      title:"Pruebas de informes",notes:"Primera prioridad post-implementación",real:true});
+    p.tasks.push({id:uid("t_"),createdAt:ts,status:"todo",doneAt:null,hrs:0,
+      cid:"shalom",pid:null,due:R14_DUE,priority:1,est:0,
+      title:"Implementación del software en los nuevos computadores",notes:"",real:true});
+    log.push("shalom · 2 nuevas tareas post-impl");
+  }
+
+  p.realData=20;
+  if(window.console) console.info("[real v20]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
