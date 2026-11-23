@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=18;
+var REAL_V=19;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3412,6 +3412,7 @@ function applyReal(p){
   if((p.realData||0)<16) applyReal16(p);
   if((p.realData||0)<17) applyReal17(p);
   if((p.realData||0)<18) applyReal18(p);
+  if((p.realData||0)<19) applyReal19(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3880,6 +3881,17 @@ function applyReal18(p){
   p.realData=18;
   if(window.console) console.info("[real v18] eliminado SOP-02, cerrado SOP-03, eliminado 3 tareas gymshop erróneas");
 }
+function applyReal19(p){
+  /* desactivar producción diaria: ya no se hace el registro de 2 dashboards al día */
+  delete p.prodSince;
+  p.prod={};
+  /* quitar KR de producción diaria de los OKRs existentes */
+  (p.okrs||[]).forEach(function(o){
+    o.krs=(o.krs||[]).filter(function(k){ return k.metric!=="daily_q"; });
+  });
+  p.realData=19;
+  if(window.console) console.info("[real v19] producción diaria desactivada");
+}
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
 var BUILTIN={};
@@ -4100,7 +4112,7 @@ function fillDefaults(p){
   ["taskF","tkF","cliF","prjF","dealF"].forEach(function(k){ p.ui[k]=Object.assign(b.ui[k],p.ui[k]||{}); });
   p.clients.forEach(ensureClient);
   if(!p.okrs.length) seedOKRs(p);
-  if(!p.prodSince) p.prodSince=todayISO();   /* desde aquí se mide la producción diaria (antes no existía el registro) */
+  /* v19: producción diaria desactivada — ya no se inicializa prodSince */
   try{ if(applyReal(p)) REAL_APPLIED=true; }catch(e){ if(window.console) console.error("[real]",e); }
   return p;
 }
@@ -4110,7 +4122,7 @@ function seedOKRs(p){
   var q=quarterOf(todayISO());
   p.okrs.push({id:uid("o_"),q:q,title:"Operación impecable: cero promesas rotas",createdAt:Date.now(),krs:[
     {id:uid("kr"),name:"Tickets resueltos dentro del SLA de 24 h",metric:"sla_q",start:0,target:100,unit:"%"},
-    {id:uid("kr"),name:"Días hábiles con los 2 dashboards de producción",metric:"daily_q",start:0,target:100,unit:"%"},
+    /* v19: KR de producción diaria eliminado */
     {id:uid("kr"),name:"Entregas recurrentes a tiempo",metric:"ontime_q",start:0,target:95,unit:"%",proposed:true}]});
   p.okrs.push({id:uid("o_"),q:q,title:"Crecer el ingreso recurrente con cuentas sanas",createdAt:Date.now(),krs:[
     {id:uid("kr"),name:"MRR al cierre del trimestre",metric:"mrr",start:null,target:null,unit:"$"},
@@ -4908,7 +4920,7 @@ function setProd(ds,slot,data){
 /* ---- OKRs ---- */
 function okr(id){ for(var i=0;i<DB.okrs.length;i++) if(DB.okrs[i].id===id) return DB.okrs[i]; return null; }
 var KR_METRICS={mrr:"MRR (automático)",clients:"Clientes recurrentes activos (automático)",won_q:"Clientes nuevos ganados en el trimestre (automático)",
-  upsell_q:"Upsells ganados en el trimestre (automático)",sla_q:"% tickets en SLA del trimestre (automático)",daily_q:"% días con 2 dashboards (automático)",
+  upsell_q:"Upsells ganados en el trimestre (automático)",sla_q:"% tickets en SLA del trimestre (automático)",
   ontime_q:"% entregas a tiempo del trimestre (automático)",pipeline:"Pipeline ponderado (automático)",healthy:"Clientes prósperos (automático)",manual:"Manual (lo actualizas tú)"};
 function saveOKR(f){
   var e={};
@@ -5102,7 +5114,7 @@ function outcomes(){ return cache("out",function(){
   out.sort(function(a,b){ return b.t-a.t; });
   return out;
 }); }
-var KIND_N={rec:"Entrega recurrente",prod:"Producción diaria",ticket:"Ticket",area:"Fase de proyecto",task:"Tarea",pay:"Pago",deal:"Comercial"};
+var KIND_N={rec:"Entrega recurrente",ticket:"Ticket",area:"Fase de proyecto",task:"Tarea",pay:"Pago",deal:"Comercial"};
 function fmtMoney(n){ if(n==null||isNaN(n)) return "—"; return Math.round(n).toLocaleString("es-CO"); }
 
 /* ---------- nivel personal (XP) ---------- */
@@ -5182,7 +5194,7 @@ function statusOf(m,v,t){
   switch(m){
     case "mrr": case "clients": case "nsm": if(t==null) return "n"; return v>=t?"g":v>=t*0.9?"y":"r";
     case "ontime": return v>=t?"g":v>=t-10?"y":"r";
-    case "daily": return v>=100?"g":v>=80?"y":"r";
+    case "daily": return "n"; /* v19: desactivada */
     case "sla": return v>=100?"g":v>=90?"y":"r";
     case "conc": if(v==null) return "n"; var cm=DB().goals.concMax||40; return v<=cm?"g":v<=cm+15?"y":"r";
     case "margin": if(t==null) return "n"; return v>=t?"g":v>=t*0.7?"y":"r";
@@ -5196,7 +5208,7 @@ var METRICS=[
   {id:"mrr",n:"MRR (ingreso recurrente mensual)",u:"$",ic:"coin",pal:"gold",desc:"Suma de la tarifa mensual vigente de los clientes recurrentes activos al cierre de la semana."},
   {id:"clients",n:"Clientes activos",u:"",ic:"users",pal:"vio",desc:"Clientes activos al cierre de la semana (recurrentes y de implementación)."},
   {id:"ontime",n:"Entregas a tiempo",u:"%",ic:"scroll",pal:"teal",desc:"Entregas recurrentes y fases de proyecto marcadas en la semana que se registraron a tiempo. Las históricas sin marca de tiempo no cuentan."},
-  {id:"daily",n:"Producción diaria (2 dashboards)",u:"%",ic:"flame",pal:"fire",desc:"Días hábiles de la semana con el dashboard de la mañana (8:00–8:45) y el de la tarde (17:00–19:00)."},
+  /* v19: métrica "daily" desactivada — producción diaria ya no se hace */
   {id:"sla",n:"Tickets dentro del SLA de 24 h",u:"%",ic:"shield",pal:"cyan",desc:"Tickets resueltos en la semana dentro de 24 h, más los que vencieron sin resolver."},
   {id:"util",n:"Utilización de horas",u:"%",ic:"clock",pal:"blue",desc:"Horas registradas con cliente ÷ horas disponibles por semana."},
   {id:"pipeline",n:"Pipeline ponderado",u:"$",ic:"target",pal:"vio",desc:"Valor mensual esperado de las oportunidades abiertas × su probabilidad."},
@@ -5219,12 +5231,8 @@ function measure(id,w){
   else if(id==="ontime"){ var D=deliveriesIn(w.from,w.to); r.rows=D; var known=D.filter(function(o){return o.late!=null&&!o.hist;});
     r.v=pct(known.filter(function(o){return !o.late;}).length,known.length); r.t=g.ontimeTarget||95;
     if(D.length>known.length) r.note=(D.length-known.length)+" entrega(s) histórica(s) sin marca de tiempo no cuentan en el %."; }
-  else if(id==="daily"){ var P=prodDays(w.from,w.to); r.rows=P; var meas=P.filter(function(x){return !x.pending;});
-    r.v=pct(meas.filter(function(x){return x.full;}).length,meas.length); r.t=100;
-    /* A1 · tambien se mide cuantos se hicieron DENTRO de la ventana pactada */
-    r.inWin=pct(meas.filter(function(x){return x.inWin;}).length,meas.length);
-    if(r.inWin!=null && r.inWin<100) r.note="Dentro de la ventana horaria: "+r.inWin+"%. Los dashboards fuera de ventana cuentan el día pero dan menos XP.";
-    if(!P.length) r.note="Sin días hábiles medibles (el registro de producción empezó el "+L.fmtDate(DB().prodSince)+")."; }
+  /* v19: métrica "daily" desactivada */
+  else if(id==="daily"){ r.v=null; r.note="Producción diaria desactivada (v19)."; }
   else if(id==="sla"){ var E=ticketEvals(w.from,w.to); r.rows=E; r.v=pct(E.filter(function(x){return x.met;}).length,E.length); r.t=100; if(!E.length) r.note="Sin tickets evaluados esta semana."; }
   else if(id==="util"){ var all=hoursIn(w.from,w.to), Hs=all.filter(function(h){return !h.migrated;}); r.rows=Hs;
     if(all.length>Hs.length) r.note=(all.length-Hs.length)+" registro(s) migrados de v5 no cuentan aquí: eran totales del mes sin fecha real (sí cuentan en el mes)."; var bill=sum(Hs.filter(function(h){return h.cid;}),function(h){return h.hrs;});
@@ -5332,7 +5340,7 @@ var HSTATE={prospero:{n:"Próspero",c:"#00e6a8",ic:"crown"},estable:{n:"Estable"
 function last4(id){ var W=weeks(4); var v=W.map(function(w){return measure(id,w).v;}).filter(function(x){return x!=null;}); return v.length? Math.round(sum(v)/v.length) : null; }
 function companyStages(){ return cache("stages",function(){
   var t=L.todayISO(), g=DB().goals, rec=L.bizClients().filter(function(c){return L.isRecurring(c)&&L.activeAt(c,t);}), mrr=L.mrrAt(t);
-  var sla4=last4("sla"), on4=last4("ontime"), d4=last4("daily"), u4=last4("util");
+  var sla4=last4("sla"), on4=last4("ontime"), u4=last4("util");
   var churn90=sum(churnIn(L.addDays(t,-90),t),function(x){return x.fee;});
   var annual=L.bizClients().filter(function(c){return L.activeAt(c,t)&&c.contract&&c.contract.annual;}).length;
   var prosp=rec.filter(function(c){ return health(c.id).state==="prospero"; }).length;
@@ -5343,7 +5351,7 @@ function companyStages(){ return cache("stages",function(){
     {n:"Estudio",d:"Base recurrente estable y soporte confiable.",ic:"anvil",reqs:[req("4+ clientes recurrentes",rec.length,4,rec.length>=4),mrrReq(0),
       req("SLA ≥ 90% (prom. 4 semanas)",sla4,90,sla4!=null&&sla4>=90,{u:"%"})]},
     {n:"Agencia",d:"Operación que cumple sin depender de heroicidades.",ic:"shield",reqs:[req("8+ clientes recurrentes",rec.length,8,rec.length>=8),mrrReq(1),
-      req("Entregas a tiempo ≥ 90% (4 sem.)",on4,90,on4!=null&&on4>=90,{u:"%"}),req("Producción diaria ≥ 90% (4 sem.)",d4,90,d4!=null&&d4>=90,{u:"%"})]},
+      req("Entregas a tiempo ≥ 90% (4 sem.)",on4,90,on4!=null&&on4>=90,{u:"%"})]},
     {n:"Agencia escalable",d:"Crece sin quemarte: hay capacidad y no se pierden clientes.",ic:"rocket",reqs:[req("12+ clientes recurrentes",rec.length,12,rec.length>=12),mrrReq(2),
       req("Utilización ≤ 85% (hay capacidad)",u4,85,u4!=null&&u4<=85,{u:"%",inv:true}),req("Churn 90 días = $0",churn90,0,churn90===0,{money:true,inv:true})]},
     {n:"Agencia líder",d:"Cartera sana y contratos de largo plazo.",ic:"crown",reqs:[req("20+ clientes recurrentes",rec.length,20,rec.length>=20),mrrReq(3),
@@ -5355,15 +5363,16 @@ function companyStages(){ return cache("stages",function(){
 }); }
 
 /* ============================================================
-   5 · RACHA (producción diaria + SLA)
+   5 · RACHA (SLA solamente — v19: producción diaria desactivada)
    ============================================================ */
 function dayVerdict(ds){
-  var P=L.prodOf(ds), br=breachDays()[ds]||[], full=!!(P.am&&P.pm);
-  var why=[]; if(!P.am) why.push("faltó el dashboard de la mañana"); if(!P.pm) why.push("faltó el dashboard de la tarde"); br.forEach(function(k){ why.push("ticket #"+k.n+" pasó de 24 h"); });
-  return {ds:ds,ok:full&&!br.length,full:full,breaches:br,why:why};
+  var br=breachDays()[ds]||[];
+  var why=[]; br.forEach(function(k){ why.push("ticket #"+k.n+" pasó de 24 h"); });
+  return {ds:ds,ok:!br.length,full:true,breaches:br,why:why};
 }
 function streak(){ return cache("streak",function(){
-  var t=L.todayISO(), since=DB().prodSince||t, days=[], d=since, g=0;
+  /* v19: racha basada solo en SLA, arranca desde hace 90 días o desde el primer ticket */
+  var t=L.todayISO(), since=L.addDays(t,-90), days=[], d=since, g=0;
   while(d<=t && g++<2000){ if(L.isBiz(d)) days.push(d); d=L.addDays(d,1); }
   var todayV= L.isBiz(t)? dayVerdict(t) : null;
   var n=0, best=0, run=0, lastBreak=null, runs=[];
@@ -5385,7 +5394,7 @@ function krValue(kr,q){
     case "clients": rows=L.bizClients().filter(function(c){return L.isRecurring(c)&&L.activeAt(c,to);}); v=rows.length; break;
     case "won_q": case "upsell_q": rows=DB().deals.filter(function(d){ return d.wonAt && d.type===(kr.metric==="won_q"?"nuevo":"upsell") && L.dateOfTs(d.wonAt)>=R.from && L.dateOfTs(d.wonAt)<=R.to; }); v=rows.length; break;
     case "sla_q": rows=ticketEvals(R.from,to); v=pct(rows.filter(function(x){return x.met;}).length,rows.length); break;
-    case "daily_q": rows=prodDays(R.from,to); var m=rows.filter(function(x){return !x.pending;}); v=pct(m.filter(function(x){return x.full;}).length,m.length); break;
+    case "daily_q": v=null; break; /* v19: desactivada */
     case "ontime_q": rows=deliveriesIn(R.from,to); var k=rows.filter(function(o){return o.late!=null&&!o.hist;}); v=pct(k.filter(function(o){return !o.late;}).length,k.length); break;
     case "pipeline": rows=pipelineAt(t); v=sum(rows,function(x){return x.w;}); break;
     case "healthy": rows=L.bizClients().filter(function(c){ return L.isRecurring(c)&&L.activeAt(c,t)&&health(c.id).state==="prospero"; }); v=rows.length; break;
@@ -5899,7 +5908,7 @@ function measureRows(r){
     case "mrr": return rowsHTML(r.rows,rMRR,"No hay clientes recurrentes activos.");
     case "clients": return rowsHTML(r.rows,rClient);
     case "ontime": return rowsHTML(r.rows,rOutcome,"No se marcaron entregas en esta semana.");
-    case "daily": return rowsHTML(r.rows,rProdDay,"Sin días hábiles medibles.");
+    case "daily": return '<div class="dim">Producción diaria desactivada (v19).</div>';
     case "sla": return rowsHTML(r.rows,rTicketEval,"Sin tickets evaluados.");
     case "util": return '<div class="row wr gap6">'+chip("Horas con cliente: "+String(r.bill||0).replace(".",","),"#4a9eff")+chip("Horas totales: "+String(r.hours||0).replace(".",","),"#87b3a8")+chip("Disponibles: "+(L.DB.goals.hoursWeek||"[EDITABLE]"),"#ffc24a")+'</div>'+rowsHTML(r.rows,rTime,"Sin horas registradas en la semana.");
     case "pipeline": return rowsHTML(r.rows,rPipe,"Sin oportunidades abiertas.");
@@ -6276,10 +6285,11 @@ function vClient(c){
    VISTA 3 · OPERACIÓN (producción, entregas, proyectos, tareas)
    ============================================================ */
 function vOperacion(){
-  var tab=UI().opTab||"produccion", tabs=[["produccion","Producción diaria"],["entregas","Entregas recurrentes"],["proyectos","Proyectos"],["tareas","Tareas"]];
+  var tab=UI().opTab||"entregas", tabs=[["entregas","Entregas recurrentes"],["proyectos","Proyectos"],["tareas","Tareas"]];
+  if(tab==="produccion") tab="entregas"; /* v19: producción diaria desactivada */
   var head=sec("Operación","Lo que se le entrega al cliente, con estados y fechas","scroll","gold")+
     '<div class="pills" role="tablist">'+tabs.map(function(x){ return '<button type="button" class="pill" role="tab" aria-selected="'+(tab===x[0])+'" aria-pressed="'+(tab===x[0])+'" '+act(function(){ UI().opTab=x[0]; L.touch(); V.render(); })+'>'+x[1]+'</button>'; }).join("")+'</div><div style="margin-top:12px">';
-  var body= tab==="entregas"? V.vEntregas() : tab==="proyectos"? vProyectos() : tab==="tareas"? V.vTareas() : vProduccion();
+  var body= tab==="entregas"? V.vEntregas() : tab==="proyectos"? vProyectos() : V.vTareas();
   return head+body+'</div>';
 }
 function vProduccion(){
@@ -6355,7 +6365,7 @@ V.krDetail=function(oid,kid){
     if(kr.metric==="mrr") list=rowsHTML(rows,rMRR); else if(kr.metric==="clients"||kr.metric==="healthy") list=rowsHTML(rows,rClient);
     else if(kr.metric==="won_q"||kr.metric==="upsell_q") list=rowsHTML(rows,rDeal,"Aún no hay ganados en el trimestre.");
     else if(kr.metric==="sla_q") list=rowsHTML(rows,rTicketEval,"Sin tickets evaluados en el trimestre.");
-    else if(kr.metric==="daily_q") list=rowsHTML(rows,rProdDay,"Sin días medibles.");
+    else if(kr.metric==="daily_q") list='<div class="dim">Producción diaria desactivada (v19).</div>';
     else if(kr.metric==="ontime_q") list=rowsHTML(rows,rOutcome,"Sin entregas.");
     else if(kr.metric==="pipeline") list=rowsHTML(rows,rPipe,"Sin oportunidades abiertas.");
     else list='<div class="dim pad">Valor manual: '+(kr.manual==null?"sin registrar":kr.manual)+'. Actualízalo editando el OKR.</div>';
@@ -6389,7 +6399,7 @@ function vTendencias(){
     '<div class="pills">'+[["semanal","13 semanas"],["mensual","12 meses"]].map(function(x){ return '<button type="button" class="pill" aria-pressed="'+(tab===x[0])+'" '+act(function(){ UI().trendTab=x[0]; L.touch(); V.render(); })+'>'+x[1]+'</button>'; }).join("")+'</div>');
   if(tab==="mensual"){
     var M=G.monthly(12), cols=[["mrr","MRR",function(x){return money(x.mrr);}],["clients","Clientes",function(x){return x.clients.length;}],["collected","Cobrado",function(x){return money(x.collected);}],
-      ["ontime","A tiempo",function(x){return x.ontime==null?"—":x.ontime+"%";}],["sla","SLA",function(x){return x.sla==null?"—":x.sla+"%";}],["daily","Producción",function(x){return x.daily==null?"—":x.daily+"%";}],
+      ["ontime","A tiempo",function(x){return x.ontime==null?"—":x.ontime+"%";}],["sla","SLA",function(x){return x.sla==null?"—":x.sla+"%";}],
       ["hours","Horas",function(x){return String(x.hours).replace(".",",");}],["won","Ganados",function(x){return x.won.length;}],["churn","Perdidos",function(x){return x.churn.length;}],["xp","XP",function(x){return fmtN(x.xp);}]];
     return head+'<div class="card pad">'+lineChart(M.map(function(x){return {v:x.mrr};}),"#ffc24a",money,"MRR mensual")+'</div>'+
       '<div class="card pad tscroll"><table class="ttab"><thead><tr><th>Mes</th>'+cols.map(function(c){return '<th>'+c[1]+'</th>';}).join("")+'</tr></thead><tbody>'+
@@ -7620,7 +7630,7 @@ function lobbyHTML(S){
     '<button type="button" class="lb-big" data-lb="d:pipeline" style="--sc:'+(STC2[pipe.st]||STC2.n)+'"><span class="lb-k">Pipeline ponderado · '+S.deals.n+' oportunidades</span><b>'+esc(pipe.txt)+'</b><span class="lb-bar"><i style="width:'+pctOf(pipe)+'%"></i></span><em>Meta '+esc(pipe.meta||"sin meta")+'</em></button>'+
     '<button type="button" class="lb-big" data-lb="g:comercial:pagos" style="--sc:'+(payPct===100?STC2.g:S.pay.paid?STC2.y:STC2.r)+'"><span class="lb-k">Cobro de '+esc(S.pay.month)+'</span><b>'+S.pay.paid+' de '+S.pay.n+' pagados</b><span class="lb-bar"><i style="width:'+payPct+'%"></i></span><em>Pendiente $'+esc(String(S.pay.pend).replace(/\B(?=(\d{3})+(?!\d))/g,"."))+'</em></button></section>';
   var right='<section class="lb-panel lb-vals"><h3>Valores detallados</h3>'+
-    mstat("ontime","Entregas a tiempo","scroll","gold")+mstat("daily","Producción diaria","flame","fire")+mstat("sla","Tickets en SLA 24 h","shield","cyan")+mstat("util","Utilización de horas","clock","blue")+
+    mstat("ontime","Entregas a tiempo","scroll","gold")+mstat("sla","Tickets en SLA 24 h","shield","cyan")+mstat("util","Utilización de horas","clock","blue")+
     stat("rep","Informes al día",S.rep.ok+" de "+S.rep.total,S.rep.broken?S.rep.broken+" vencidos":"0 vencidos",repPct,S.rep.broken?STC2.r:repPct>=75?STC2.g:STC2.y,"calendar","vio","g:operacion:entregas")+
     stat("pj","Avance de proyectos",S.pj.avg==null?"—":S.pj.avg+"%",S.pj.n+" activos",S.pj.avg||0,S.pj.late?STC2.r:STC2.n,"anvil","blue","g:operacion:proyectos")+'</section>';
   var hl=hex("Tickets abiertos",S.tk.open,S.tk.breached?S.tk.breached+" fuera de SLA":"ninguno fuera de SLA",S.tk.breached?STC2.r:STC2.g,"shield","fire","g:soporte")+
@@ -7805,7 +7815,7 @@ function trWeekly(T){
   /* matriz semáforo: todos los indicadores × 13 semanas */
   var mat='<div class="tr-mat">'+T.sc.filter(function(s){return s.id!=="nsm";}).map(function(s){ return '<div class="tr-mr"><span title="'+esc(s.n)+'">'+esc(s.n.split(" (")[0].split(" ·")[0])+'</span>'+s.st.map(function(col,i){ return '<button type="button" class="tr-mc" style="--mc:'+col+'" data-tr="w:'+s.id+':'+i+'" title="'+esc(s.n+" · "+s.w[i]+": "+s.txt[i])+'" aria-label="'+esc(s.n+", "+s.w[i]+": "+s.txt[i])+'"></button>'; }).join("")+'</div>'; }).join("")+'</div>';
   right+=panel("Semáforo · 13 semanas",mat,"d:mrr",'<span class="tr-meta">Cada casilla abre su semana</span>');
-  var rings=[["ontime","Entregas a tiempo"],["daily","Producción diaria"],["sla","Tickets en SLA"]].map(function(x){ var s=by[x[0]], v=lastV(s.v);
+  var rings=[["ontime","Entregas a tiempo"],["sla","Tickets en SLA"]].map(function(x){ var s=by[x[0]], v=lastV(s.v);
     return '<button type="button" class="tr-rbtn" data-tr="d:'+x[0]+'">'+ringSVG(v,s.st[12]==="#6f9c91"||s.st[12]==="#8fb3a8"?TC.cy:s.st[12],v==null?"—":v+"%","meta "+(s.tt||"—"))+'<span>'+x[1]+'</span>'+
       '<span class="tr-dots">'+s.st.map(function(col,i){ return '<i style="--mc:'+col+'" data-tr="w:'+s.id+':'+i+'" title="'+esc(s.w[i]+": "+s.txt[i])+'"></i>'; }).join("")+'</span></button>'; }).join("");
   var center='<section class="tr-core"><button type="button" class="tr-rx" data-tr="d:mrr">'+reactorSVG(mp,mrr.st[12]==="#8fb3a8"?TC.cy:mrr.st[12],mrr.txt[12],mt?("meta "+mrr.tt+" · "+mp+"%"):"sin meta")+'</button>'+
