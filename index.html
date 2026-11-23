@@ -3914,21 +3914,22 @@ function applyReal20(p){
     prSS.name="Implementación de Notion";
     log.push("sign_supply · proyecto renombrado a: "+prSS.name);
 
-    /* marcar áreas entregadas: Talento Humano (index 0) y Sistemas (index 3) */
+    /* marcar áreas entregadas: TH, Sistemas, Resolver correo, Nueva propuesta, Cronograma */
     (prSS.areas||[]).forEach(function(a){
-      if(/Talento/i.test(a.name) || /Sistemas/i.test(a.name)){
+      if(/Talento/i.test(a.name) || /Sistemas/i.test(a.name)
+        || /Resolver puntos pendientes/i.test(a.name)
+        || /nueva propuesta/i.test(a.name)
+        || /cronograma de terminación/i.test(a.name)){
         if(!a.done){ a.done=R14_TODAY; log.push("sign_supply · área entregada · "+a.name); }
       }
     });
 
-    /* marcar tareas "Resolver puntos pendientes del correo", "Crear nueva propuesta de informes",
-       "Elaborar cronograma de terminación" como urgentes (pri:0) — son áreas del proyecto que ya
-       estaban como tareas */
+    /* marcar tareas correspondientes como done */
     (p.tasks||[]).forEach(function(t){
       if(t.cid==="sign_supply" || (t.pid && t.pid==="x_PRY-15")){
-        if(/Resolver puntos pendientes/i.test(t.title)) t.priority=0;
-        if(/Crear nueva propuesta/i.test(t.title)) t.priority=0;
-        if(/Elaborar cronograma/i.test(t.title)) t.priority=0;
+        if(/Resolver puntos pendientes/i.test(t.title) || /Crear nueva propuesta/i.test(t.title) || /Elaborar cronograma/i.test(t.title)){
+          if(t.status!=="done"){ t.status="done"; t.doneAt=ts; }
+        }
       }
     });
 
