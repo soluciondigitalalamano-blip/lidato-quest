@@ -5428,10 +5428,8 @@ function mitTask(){
   return open[0]? {task:open[0],pinned:false} : null;
 }
 function missions(){
-  var t=L.todayISO(), P=L.prodOf(t), biz=L.isBiz(t), now=new Date(), mins=now.getHours()*60+now.getMinutes(), out=[];
-  ["am","pm"].forEach(function(s){ var w=L.PROD_SLOTS[s], done=!!P[s];
-    out.push({id:"prod-"+s,kind:"prod",slot:s,title:w.l,sub:"Ventana "+w.win+(biz?"":" · hoy no es día hábil (no afecta la racha)"),done:done,
-      late:!done&&biz&&mins>w.to, live:!done&&mins>=w.from&&mins<=w.to, xp:15, rec:P[s]||null}); });
+  var t=L.todayISO(), out=[];
+  /* v19: producción diaria desactivada — ya no se generan misiones am/pm */
   DB().tickets.filter(function(k){return k.status!=="resuelto"&&L.client(k.cid);}).sort(function(a,b){return a.openedAt-b.openedAt;}).forEach(function(k){
     out.push({id:"tk-"+k.id,kind:"ticket",ticket:k,title:"Resolver ticket #"+k.n,sub:k.subject,done:false,xp:30}); });
   var m=mitTask(); out.push({id:"mit",kind:"mit",task:m?m.task:null,pinned:m?m.pinned:false,title:"Tarea más importante del día",sub:m?m.task.title:"No hay tareas abiertas",done:m?m.task.status==="done":false,xp:m&&m.task.cid?8:2});
@@ -5459,8 +5457,7 @@ function alerts(){ return cache("alerts",function(){
       if(due<t && !db.payments.some(function(p){return p.cid===c.id&&p.period===per;})) out.push({id:"py-"+c.id+per,sev:"elite",cat:"Pagos",title:"Pago de "+L.monthName(per)+" sin registrar",sub:c.name+" · vencía "+L.fmtDate(due),ic:"coin",go:{payNew:[c.id,per]}}); }); } });
   scorecard().forEach(function(row){ var cur=row.series[row.series.length-1]; if(cur.st==="r") out.push({id:"sc-"+row.m.id,sev:"elite",cat:"Scorecard",title:row.m.n+" en rojo esta semana",sub:"Abre el indicador para ver qué lo explica",ic:"chart",go:{metric:row.m.id}}); });
   db.deals.forEach(function(d){ if(L.dealOpen(d)&&d.nextDate&&d.nextDate<t) out.push({id:"dl-"+d.id,sev:"minion",cat:"Comercial",title:"Siguiente paso atrasado: "+d.name,sub:(d.next||"Sin descripción")+" · "+L.fmtRel(d.nextDate),ic:"target",go:{deal:d.id}}); });
-  var biz=L.isBiz(t), P=L.prodOf(t), mins=new Date().getHours()*60+new Date().getMinutes();
-  if(biz) ["am","pm"].forEach(function(s){ var w=L.PROD_SLOTS[s]; if(!P[s]&&mins>w.to) out.push({id:"pr-"+s,sev:"elite",cat:"Producción",title:w.l+" sin registrar",sub:"La ventana "+w.win+" ya pasó: regístralo para no romper la racha",ic:"flame",go:{prod:s}}); });
+  /* v19: producción diaria desactivada — ya no se generan alertas de producción */
   /* A6 · riesgo de concentracion como enemigo visible */
   var cm=db.goals.concMax||40, cv=measure("conc",weeks(1)[0]);
   if(cv.v!=null && cv.v>cm && cv.top) out.push({id:"conc",sev:"boss",cat:"Riesgo",
@@ -5493,7 +5490,7 @@ function achievements(){ return cache("ach",function(){
   var ME=monthEndsMRR(24), rec=null, prevMax=-1; ME.forEach(function(x,i){ if(i>0&&x.v>prevMax&&prevMax>0) rec=x; prevMax=Math.max(prevMax,x.v); });
   add("mrrrec","MRR récord","Cierra un mes con el MRR más alto de tu historia.",rec,rec?1:0,1,rec&&rec.ds,ME.map(function(x){return {label:L.monthName(x.k)+": $"+fmtMoney(x.v)};}),"chart");
   [[5,"Racha de 5 días"],[20,"Racha de 20 días"],[60,"Racha de 60 días"]].forEach(function(x){
-    add("st"+x[0],x[1],"Días hábiles seguidos con los 2 dashboards y sin romper el SLA.",st.best>=x[0],Math.min(st.best,x[0]),x[0],null,[{label:"Racha actual "+st.n+" · mejor "+st.best}],"flame"); });
+    add("st"+x[0],x[1],"Días hábiles seguidos sin romper el SLA.",st.best>=x[0],Math.min(st.best,x[0]),x[0],null,[{label:"Racha actual "+st.n+" · mejor "+st.best}],"flame"); });
   var sc=scorecard(), perfect=null; for(var i=0;i<13;i++){ var meas=sc.filter(function(r){return r.series[i].st!=="n";}); if(meas.length>=5 && meas.every(function(r){return r.series[i].st==="g";})) perfect=sc[0].series[i].w; }
   add("perfect","Semana perfecta","Una semana con 5 o más indicadores medidos y todos en verde.",perfect,perfect?1:0,1,perfect&&perfect.to,perfect?[{label:"Semana del "+L.fmtDate(perfect.from)}]:[],"star");
   var won=O.filter(function(o){return o.kind==="deal";}), wn=won.filter(function(o){return o.label.indexOf("Cliente nuevo")===0;}), wu=won.filter(function(o){return o.label.indexOf("Upsell")===0;});
@@ -6025,7 +6022,7 @@ V.streakDetail=function(){
     var S=G.streak(), t=L.todayISO(), days=[], d=t, n=0;
     while(n<40 && d>=S.since){ if(L.isBiz(d)) { days.push(d); n++; } d=L.addDays(d,-1); }
     return mhead("Racha de cumplimiento",S.n+" días hábiles","flame","fire")+'<div class="mbody">'+
-      '<p class="muted">Un día cuenta si registras los 2 dashboards de producción y ningún ticket pasa de 24 h ese día. Fines de semana y festivos no cuentan ni rompen. Se mide desde el '+esc(L.fmtDate(S.since))+'.</p>'+
+      '<p class="muted">Un día cuenta si ningún ticket pasa de 24 h ese día. Fines de semana y festivos no cuentan ni rompen. Se mide desde el '+esc(L.fmtDate(S.since))+'.</p>'+
       '<div class="row wr gap6">'+chip("Actual: "+S.n,"#ff9138",1)+chip("Mejor: "+S.best,"#ffc24a",1)+(S.lastBreak?chip("Último corte: "+L.fmtDate(S.lastBreak.ds),"#ff5d7d",1):"")+'</div>'+
       (S.lastBreak?'<div class="note">La racha anterior se cortó el '+esc(L.fmtDate(S.lastBreak.ds))+' porque '+esc(S.lastBreak.why.join(", "))+'. Sin castigo extra: solo empieza a contar de nuevo.</div>':'')+
       '<div class="dlist">'+days.map(function(ds){ var v=G.dayVerdict(ds), pend=ds===t&&!v.ok, col=v.ok?"#00e6a8":pend?"#ffc24a":"#ff5d7d";
@@ -6090,13 +6087,13 @@ function vMando(){
     '<div class="dim">'+(VD.anyFee?'MRR '+money(VD.mrr)+' · hace 90 días '+money(VD.mrrAgo)+' ('+(VD.dMrr>=0?"+":"")+money(VD.dMrr).replace("$-","-$")+')':'<span class="edit-tag">[EDITABLE]</span> Carga la tarifa mensual de tus clientes para medirlo')+' · '+plural(VD.clients,"cliente activo","clientes activos")+'</div></div>';
   var q2='<div class="card verd hov" '+cardBtn(function(){ var el=document.getElementById("missions"); if(el) el.scrollIntoView({behavior:U.motion()?"smooth":"auto"}); },"Ver misiones de hoy")+'>'+
     '<div class="k-lbl">¿Qué hago hoy para ganar?</div><div class="vbig" style="color:'+(pend?"#ffc24a":"#00e6a8")+'">'+(pend?plural(pend,"misión","misiones")+" pendientes":"Día ganado")+'</div>'+
-    '<div class="dim">2 dashboards de producción · '+plural(V.openTickets().length,"ticket abierto","tickets abiertos")+' · tarea clave</div></div>';
+    '<div class="dim">'+plural(V.openTickets().length,"ticket abierto","tickets abiertos")+' · tarea clave</div></div>';
   var q3='<div class="card verd hov" '+cardBtn(V.stageDetail,"Ver la siguiente meta")+'>'+
     '<div class="k-lbl">¿Qué tan cerca está la siguiente meta?</div><div class="vbig" style="color:var(--gold)">'+(nx?esc(nx.n)+" · "+nx.prog+"%":"Etapa máxima")+'</div>'+
     (nx?bar(nx.prog,"tier","","stage-next")+'<div class="dim">'+nx.reqs.filter(function(r){return r.ok;}).length+' de '+nx.reqs.length+' requisitos cumplidos</div>':'')+'</div>';
   return '<div class="grid-3 verdicts">'+q1+q2+q3+'</div>'+
     '<div class="hud2">'+companyCard()+nsmCard()+'</div>'+
-    '<div class="grid-2">'+'<div class="sec" id="missions">'+sec("Misiones de hoy","Los 2 dashboards, los tickets abiertos y la tarea más importante","sword","teal",streakChip())+missionList()+'</div>'+
+    '<div class="grid-2">'+'<div class="sec" id="missions">'+sec("Misiones de hoy","Los tickets abiertos y la tarea más importante","sword","teal",streakChip())+missionList()+'</div>'+
       '<div class="sec">'+sec("Enemigos en el mapa","Aparecen cuando algo real entra en rojo. Derrotarlos es resolver la causa","skull","rose",chip(G.alerts().length+" activos","#ff5d7d",1))+alertList()+'</div></div>'+
     '<div class="sec">'+sec("Scorecard semanal","Estilo EOS · 13 semanas · toca un indicador o una semana para ver su desglose","chart","cyan")+scorecardTable()+'</div>'+
     '<div class="sec">'+operatorStrip()+'</div>';
@@ -6292,19 +6289,7 @@ function vOperacion(){
   var body= tab==="entregas"? V.vEntregas() : tab==="proyectos"? vProyectos() : V.vTareas();
   return head+body+'</div>';
 }
-function vProduccion(){
-  var t=L.todayISO(), start=L.addDays(L.mondayOf(t),-21), days=[];
-  for(var i=0;i<28;i++) days.push(L.addDays(start,i));
-  var cells=days.map(function(ds){ var biz=L.isBiz(ds), P=L.prodOf(ds), fut=ds>t, hol=L.holidayName(ds), before=ds<(L.DB.prodSince||t);
-    function slot(s){ var on=!!P[s]; return '<button type="button" class="ps '+(on?"on":"")+'" '+(fut?"disabled":act(function(){ V.prodModal(ds,s); }))+' aria-label="'+esc(L.PROD_SLOTS[s].l+" "+L.fmtDate(ds)+(on?" registrado":""))+'">'+(s==="am"?"AM":"PM")+'</button>'; }
-    var full=P.am&&P.pm, col=!biz?"":full?"ok":fut||ds===t?"":before?"pre":"miss";
-    return '<div class="pday '+col+(ds===t?" today":"")+(!biz?" off":"")+'"><div class="dt">'+L.DOW_S[L.parseISO(ds).getDay()]+' '+L.parseISO(ds).getDate()+'</div>'+(hol?'<div class="dim" style="font-size:9px">'+esc(hol)+'</div>':'')+slot("am")+slot("pm")+'</div>'; }).join("");
-  var W=G.weeks(4).map(function(w){ return G.measure("daily",w); });
-  return '<div class="card pad-l stack"><div class="row wr"><div class="grow"><div class="k-lbl">Producción fija</div><b>2 dashboards por día hábil: mañana 8:00–8:45 y tarde 17:00–19:00</b>'+
-    '<div class="dim" style="font-size:12px">Cada registro pide el cliente y una nota: es la evidencia. Registrar el mismo día da 15 XP; después, 5 XP.</div></div>'+
-    W.map(function(r){ return dl(chip("Sem. "+r.w.label+": "+(r.v==null?"—":r.v+"%"),STC[r.st],1),function(){ V.metricDetail("daily",8+G.weeks(4).map(function(x){return x.from;}).indexOf(r.w.from)+1); },"Producción semana "+r.w.label); }).join("")+'</div>'+
-    '<div class="pcal">'+cells+'</div><div class="dim" style="font-size:11px">Medición desde el '+esc(L.fmtDate(L.DB.prodSince))+' (antes no existía este registro).</div></div>';
-}
+function vProduccion(){ /* v19: producción diaria desactivada */ return ""; }
 function vProyectos(){
   var F=UI().prjF;
   var P=L.DB.projects.filter(function(p){ return (F.st==="todos"||p.status===F.st) && (!F.cid||p.cid===F.cid) && L.client(p.cid); }).sort(function(a,b){ return (a.due||"9999")<(b.due||"9999")?-1:1; });
@@ -7185,7 +7170,7 @@ V.help=function(){
       '<li>La XP se recalcula desde tus datos: deshacer una entrega elimina su XP; repetirla no paga dos veces.</li>'+
       '<li>Registrar horas, abrir el app o hacer clic no da XP. Las tareas internas dan poco; los resultados para el cliente, mucho.</li>'+
       '<li>Tareas cerradas en menos de 10 minutos sin horas y tickets cerrados en menos de 2 minutos no dan XP.</li>'+
-      '<li>La racha cuenta días hábiles con los 2 dashboards y sin romper el SLA. Si se corta, solo vuelve a empezar.</li></ul>'+
+      '<li>La racha cuenta días hábiles sin romper el SLA. Si se corta, solo vuelve a empezar.</li></ul>'+
       '<details><summary class="k-lbl" style="cursor:pointer">Tabla de XP</summary><div class="dlist">'+G.XP_RULES.map(function(x){ return V.rowWrap('<span class="grow">'+esc(x[0])+'</span><span class="num">'+esc(String(x[1]))+'</span>'); }).join("")+'</div></details></div>'+
       '<div class="mfoot"><span class="sp"></span><button type="button" class="b3 acc" '+act(U.closeModal)+'>Entendido</button></div>';
   },{},{label:"Ayuda"});
@@ -7507,8 +7492,7 @@ function hvals(){
     var nd=(v==="0" && /--b2:#6f9c91/i.test(st));
     var e=document.createElement("b"); e.className="lq-hv"+(nd?" nd":""); e.textContent=nd?"—":v; d.appendChild(e); }
 }
-var OPP=[["flame","fire","Mañana y tarde · 2 dashboards","Cada día hábil se registran dos dashboards de producción: la ventana de la mañana y la de la tarde. Cada registro pide el cliente y una nota como evidencia."],
-  ["scroll","gold","Diarios · semanales · mensuales","Las entregas recurrentes de cada cliente durante el mes, con su estado y su fecha. Despliega un cliente para ver cada entrega."],
+var OPP=[["scroll","gold","Diarios · semanales · mensuales","Las entregas recurrentes de cada cliente durante el mes, con su estado y su fecha. Despliega un cliente para ver cada entrega."],
   ["anvil","blue","Implementaciones por fases","Proyectos de implementación con sus áreas, horas registradas y avance. Cada proyecto se abre para ver sus tareas."],
   ["check","cyan","Pendientes con fecha","Todas las tareas con cliente, prioridad y fecha límite, ordenadas para atacar primero lo urgente."]];
 function paths(){
