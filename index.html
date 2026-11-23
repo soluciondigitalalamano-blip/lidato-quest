@@ -6093,10 +6093,10 @@ function companyCard(){
 function nsmCard(){
   var S=G.scorecard().filter(function(r){return r.m.id==="nsm";})[0].series, r=S[12], tot=r.total||0, p=tot?Math.round((r.v||0)/tot*100):0;
   /* v18 · desglose cobrado/pendiente del mes actual dentro del MRR sano */
-  var curPer=L.curMonth(), cobrado=0, pendiente=0, pend=[];
-  if(r.rows) r.rows.forEach(function(x){
+  var curPer=L.curMonth(), cobrado=0, pendiente=0, pend=[], db=L.DB||{};
+  if(r.rows && db.payments) r.rows.forEach(function(x){
     if(x.h.score!=null && x.h.score>=70 && x.fee){
-      var pays=DB().payments.filter(function(pp){ return pp.cid===x.cid && pp.period===curPer; });
+      var pays=db.payments.filter(function(pp){ return pp.cid===x.cid && pp.period===curPer; });
       if(pays.length) cobrado+=x.fee; else { pendiente+=x.fee; pend.push(x.name); }
     }
   });
