@@ -3320,14 +3320,13 @@ var REAL_OKR={ q:"2026-Q4", title:"Llegar a $6.000.000 MRR y consolidar ventas (
 /* Compromisos de la semana del 5 al 9 de octubre, hoja "3. Semana Oct 5-9".
    pri: 0 Urgente · 1 Alta · 2 Media · 3 Baja */
 var REAL_TASKS=[
-  {cid:"gymshop",     due:"2026-10-05", pri:1, title:"Configurar portales (TH, Jurídica, Integral, Contabilidad)"},
-  {cid:"gymshop",     due:"2026-10-05", pri:1, title:"Configurar portales (Soporte, Compras, I+D+i, Proyectos)"},
+  /* tareas gymshop de portales eliminadas en v18: eran de INCOMELEC, no de Gym Shop */
   {cid:"san_fernando",due:"2026-10-05", pri:1, title:"Entregar TH, Jurídica y Administración en Notion"},
   {cid:"",            due:"2026-10-05", pri:2, title:"Preparar portafolio para Liliana (Ventas)"},
   {cid:"incomelec",   due:"2026-10-06", pri:1, title:"Nuevo informe de cobros y plan de gestión por áreas"},
   {cid:"incomelec",   due:"2026-10-06", pri:1, title:"Informe de tareas de todas las áreas"},
   {cid:"sign_supply", due:"2026-10-06", pri:1, title:"Terminar áreas Sistemas, TH, Logística y Administración"},
-  {cid:"gymshop",     due:"2026-10-07", pri:0, title:"ENTREGAR SISTEMA DE TAREAS (deadline)"},
+  /* tarea gymshop "ENTREGAR SISTEMA DE TAREAS" eliminada en v18: confusión de cliente */
   {cid:"andina",      due:"2026-10-15", pri:0, title:"Proyecto de Zoho Desk (comprometido para el 15)"},
   {cid:"andina",      due:"2026-10-08", pri:1, title:"Capacitación de IA e informes para empresas medianas"},
   {cid:"incomelec",   due:"2026-10-09", pri:1, title:"Adelantar todos los informes mensuales atrasados"},
@@ -3867,8 +3866,15 @@ function applyReal17(p){
 function applyReal18(p){
   /* eliminar ticket SOP-02 de Andina: solicitud cancelada por el cliente */
   p.tickets=(p.tickets||[]).filter(function(t){ return t.id!=="x_SOP-02"; });
+  /* eliminar 3 tareas de gymshop que eran de INCOMELEC, no de Gym Shop */
+  var bad=["Configurar portales (TH, Jurídica, Integral, Contabilidad)",
+           "Configurar portales (Soporte, Compras, I+D+i, Proyectos)",
+           "ENTREGAR SISTEMA DE TAREAS (deadline)"];
+  p.tasks=(p.tasks||[]).filter(function(t){
+    return !(t.cid==="gymshop" && bad.indexOf(t.title)>=0);
+  });
   p.realData=18;
-  if(window.console) console.info("[real v18] eliminado SOP-02 (Pedir funciones de administración)");
+  if(window.console) console.info("[real v18] eliminado SOP-02 + 3 tareas gymshop erróneas");
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
