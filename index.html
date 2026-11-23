@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=16;
+var REAL_V=17;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3411,6 +3411,7 @@ function applyReal(p){
   if((p.realData||0)<14) applyReal14(p);
   if((p.realData||0)<15) applyReal15(p);
   if((p.realData||0)<16) applyReal16(p);
+  if((p.realData||0)<17) applyReal17(p);
   p.realData=REAL_V;
   return true;
 }
@@ -3841,6 +3842,28 @@ function applyReal16(p){
   if(window.console) console.info("[real v16]",log);
 }
 
+/* REAL v17 · actualización del dueño (22-nov-2026)
+   1) GYM Shop: pago de octubre recibido a tiempo (payDay=20 → 2026-10-20).
+   2) PRY-03 "Instalación del Sistema de Tareas" de GYM Shop: proyecto completado.
+      Se cierran todas las áreas pendientes y se pone status "cerrado".
+   Corre una sola vez (p.realData < 17). */
+function applyReal17(p){
+  p.payments=p.payments||[]; var log=[];
+  /* 1 · pago de octubre de GYM Shop */
+  var cid="gymshop", per="2026-10", payId="pay_r17_gymshop_202610";
+  if(!p.payments.some(function(y){return y.cid===cid&&y.period===per;})){
+    p.payments.push({id:payId,createdAt:Date.now(),cid:cid,amount:1000000,date:"2026-10-20",period:per,kind:"recurrente",note:"Pago confirmado por el dueño (22-nov-2026)"});
+    log.push("pago gymshop oct $1.000.000 · 2026-10-20");
+  }
+  /* 2 · cerrar PRY-03 (Sistema de Tareas GYM Shop) */
+  (p.projects||[]).forEach(function(pr){
+    if(pr.id!=="x_PRY-03"||pr.cid!=="gymshop") return;
+    (pr.areas||[]).forEach(function(a){ if(!a.done){ a.done=R14_TODAY; log.push("fase hecha · "+pr.name+" · "+a.name); } });
+    if(pr.status!=="cerrado"){ pr.status="cerrado"; pr.closedAt=Date.now(); log.push("proyecto cerrado · "+pr.name); }
+  });
+  if(window.console) console.info("[real v17]",log);
+}
+
 var DB=null, REV=0, saveTimer=null, storageErr=false;
 var BUILTIN={};
 (window.LIDATO_CLIENTS||[]).forEach(function(c){ BUILTIN[c.id]=c; });
@@ -4088,7 +4111,7 @@ function load(){
       /* A4 · un v6 presente pero danado NO se abandona en silencio: se repara lo
          reparable, se guarda el original crudo aparte y se avisa. */
       /* v11 · antes de aplicar los datos reales v4 se guarda una copia intacta */
-      if((p.realData||0)<16){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
+      if((p.realData||0)<17){ try{ localStorage.setItem(K6+"_antes_v"+((p.realData||0)+1), raw); }catch(e){} }
       if(validateV6(p)){ try{ DB=fillDefaults(p); if(REAL_APPLIED) saveNow(); return; }catch(e){} }
       try{ DROPPED=sanitize(p); }catch(e){ DROPPED=[]; }
       try{ localStorage.setItem(K6+"_danado", raw); }catch(e){}
