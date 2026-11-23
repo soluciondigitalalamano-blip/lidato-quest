@@ -6092,9 +6092,24 @@ function companyCard(){
 }
 function nsmCard(){
   var S=G.scorecard().filter(function(r){return r.m.id==="nsm";})[0].series, r=S[12], tot=r.total||0, p=tot?Math.round((r.v||0)/tot*100):0;
+  /* v18 · desglose cobrado/pendiente del mes actual dentro del MRR sano */
+  var curPer=L.curMonth(), cobrado=0, pendiente=0, pend=[];
+  if(r.rows) r.rows.forEach(function(x){
+    if(x.h.score!=null && x.h.score>=70 && x.fee){
+      var pays=DB().payments.filter(function(pp){ return pp.cid===x.cid && pp.period===curPer; });
+      if(pays.length) cobrado+=x.fee; else { pendiente+=x.fee; pend.push(x.name); }
+    }
+  });
+  var coLine="";
+  if(r.v!=null && (cobrado||pendiente)){
+    coLine='<div style="font-size:11.5px;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">';
+    if(cobrado) coLine+='<span style="color:#00e6a8">✓ Cobrado: '+money(cobrado)+'</span>';
+    if(pendiente) coLine+='<span style="color:#ffc24a">⏳ Pendiente: '+money(pendiente)+' ('+pend.join(", ")+')</span>';
+    coLine+='</div>';
+  }
   return '<div class="card pad-l hov" '+cardBtn(function(){ V.metricDetail("nsm"); },"North Star: ver desglose")+'>'+
     '<div class="row"><div class="grow"><div class="k-lbl">North Star · MRR sano</div><div class="vbig num" style="color:var(--gold)">'+(r.v==null?'<span class="edit-tag">[EDITABLE] faltan tarifas</span>':money(r.v))+'</div>'+
-    '<div class="dim" style="font-size:12px">'+p+'% de tu MRR ('+money(tot)+') viene de cuentas prósperas (salud ≥ 70). Crece solo si vendes más Y entregas bien.</div></div>'+A.art("star","gold",72,"lit")+'</div>'+
+    '<div class="dim" style="font-size:12px">'+p+'% de tu MRR ('+money(tot)+') viene de cuentas prósperas (salud ≥ 70). Crece solo si vendes más Y entregas bien.</div>'+coLine+'</div>'+A.art("star","gold",72,"lit")+'</div>'+
     bar(p,"tier","lg","nsm")+spark(S.map(function(x){return x.v;}),"#ffc24a")+'</div>';
 }
 function spark(vals,col){
