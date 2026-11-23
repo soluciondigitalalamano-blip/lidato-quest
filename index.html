@@ -3866,6 +3866,10 @@ function applyReal17(p){
 function applyReal18(p){
   /* eliminar ticket SOP-02 de Andina: solicitud cancelada por el cliente */
   p.tickets=(p.tickets||[]).filter(function(t){ return t.id!=="x_SOP-02"; });
+  /* cerrar SOP-03 de gymshop: ya fue resuelto */
+  (p.tickets||[]).forEach(function(t){
+    if(t.id==="x_SOP-03" && t.status!=="resuelto"){ t.status="resuelto"; t.resolvedAt=Date.now(); }
+  });
   /* eliminar 3 tareas de gymshop que eran de INCOMELEC, no de Gym Shop */
   var bad=["Configurar portales (TH, Jurídica, Integral, Contabilidad)",
            "Configurar portales (Soporte, Compras, I+D+i, Proyectos)",
@@ -3874,7 +3878,7 @@ function applyReal18(p){
     return !(t.cid==="gymshop" && bad.indexOf(t.title)>=0);
   });
   p.realData=18;
-  if(window.console) console.info("[real v18] eliminado SOP-02 + 3 tareas gymshop erróneas");
+  if(window.console) console.info("[real v18] eliminado SOP-02, cerrado SOP-03, eliminado 3 tareas gymshop erróneas");
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
