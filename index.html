@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=20;
+var REAL_V=21;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3414,6 +3414,7 @@ function applyReal(p){
   if((p.realData||0)<18) applyReal18(p);
   if((p.realData||0)<19) applyReal19(p);
   if((p.realData||0)<20) applyReal20(p);
+  if((p.realData||0)<21) applyReal21(p);
   p.realData=REAL_V;
   return true;
 }
@@ -4021,6 +4022,42 @@ function applyReal20(p){
 
   p.realData=20;
   if(window.console) console.info("[real v20]",log);
+}
+
+/* REAL v21 · sync Notion "Bitácora" (24-nov-2026, 11:40 Bogotá)
+   - INCOMELEC · INF-18 Informe Diario de Tesorería: entregado el lunes 23-nov
+     (Bitácora: 14 de 19 días hábiles de noviembre; v10 dejó marcado hasta el 22-nov).
+   - Andina · SOP-01 "Crear empresa Dorada": Completado en la Bitácora. Se marca resuelto
+     con la fecha en que se registró allí (23-nov-2026 14:58 Bogotá); no hay otra fecha.
+   Aditiva e idempotente: no desmarca nada ni toca lo que el dueño ya haya editado.
+   Corre una sola vez (p.realData < 21). */
+var R21_K="2026-11", R21_DAYS=["2026-11-23"], R21_SOP01_AT=Date.UTC(2026,10,23,19,58,0);
+function applyReal21(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; p.tickets=p.tickets||[]; var log=[];
+  var hol=(p.settings&&p.settings.holidays)? holidaysCO(2026) : {};
+  /* 1 · tesorería diaria de INCOMELEC */
+  var c=p.clients.filter(function(x){return x.id==="incomelec";})[0]||p.clients.filter(function(x){return /^i[nm]comelec/i.test(x.name||"");})[0];
+  if(c&&Array.isArray(c.reportItems)){
+    c.reportItems.forEach(function(it){
+      if(it.id!=="INF-18"||it.cadence!=="daily") return;
+      var key="ri_"+it.id, id=c.id+"|"+key, C=p.cycles[R21_K]=p.cycles[R21_K]||{};
+      var sd=C[id]||{priority:null,notes:"",hrs:0,d:{}}; sd.d=sd.d||{};
+      R21_DAYS.forEach(function(ds){
+        var w=parseISO(ds).getDay(); if(w===0||w===6||hol[ds]) return;
+        if(!sd.d[ds]){ sd.d[ds]=true; log.push(c.id+" · INF-18 · "+ds); }
+        for(var u=1;u<=(it.qty||1);u++){ var ref="d|"+c.id+"|"+key+"|"+ds+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:Math.min(r7noon(ds),Date.now()),late:false}; }
+      });
+      C[id]=sd;
+    });
+  }
+  /* 2 · SOP-01 de Andina resuelto */
+  p.tickets.forEach(function(t){
+    if(t.id!=="x_SOP-01"||t.status==="resuelto") return;
+    t.status="resuelto"; t.resolvedAt=Math.min(R21_SOP01_AT,Date.now());
+    if(!String(t.resolution||"").trim()) t.resolution="Completado según la Bitácora de Notion (23-nov-2026).";
+    log.push("ticket resuelto · SOP-01 · "+t.subject);
+  });
+  if(window.console) console.info("[real v21]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
