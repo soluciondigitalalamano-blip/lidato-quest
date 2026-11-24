@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=21;
+var REAL_V=22;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3415,6 +3415,7 @@ function applyReal(p){
   if((p.realData||0)<19) applyReal19(p);
   if((p.realData||0)<20) applyReal20(p);
   if((p.realData||0)<21) applyReal21(p);
+  if((p.realData||0)<22) applyReal22(p);
   p.realData=REAL_V;
   return true;
 }
@@ -4058,6 +4059,29 @@ function applyReal21(p){
     log.push("ticket resuelto · SOP-01 · "+t.subject);
   });
   if(window.console) console.info("[real v21]",log);
+}
+
+/* REAL v22 · actualización del dueño (24-nov-2026, 11:30 Bogotá)
+   - INCOMELEC · INF-18 Informe Diario de Tesorería del martes 24-nov: entregado a tiempo.
+   Aditiva e idempotente. Corre una sola vez (p.realData < 22). */
+var R22_K="2026-11", R22_DAYS=["2026-11-24"];
+function applyReal22(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; var log=[];
+  var hol=(p.settings&&p.settings.holidays)? holidaysCO(2026) : {};
+  var c=p.clients.filter(function(x){return x.id==="incomelec";})[0]||p.clients.filter(function(x){return /^i[nm]comelec/i.test(x.name||"");})[0];
+  if(!c||!Array.isArray(c.reportItems)) return;
+  c.reportItems.forEach(function(it){
+    if(it.id!=="INF-18"||it.cadence!=="daily") return;
+    var key="ri_"+it.id, id=c.id+"|"+key, C=p.cycles[R22_K]=p.cycles[R22_K]||{};
+    var sd=C[id]||{priority:null,notes:"",hrs:0,d:{}}; sd.d=sd.d||{};
+    R22_DAYS.forEach(function(ds){
+      var w=parseISO(ds).getDay(); if(w===0||w===6||hol[ds]) return;
+      if(!sd.d[ds]){ sd.d[ds]=true; log.push(c.id+" · INF-18 · "+ds); }
+      for(var u=1;u<=(it.qty||1);u++){ var ref="d|"+c.id+"|"+key+"|"+ds+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:Math.min(r7noon(ds),Date.now()),late:false}; }
+    });
+    C[id]=sd;
+  });
+  if(window.console) console.info("[real v22]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
