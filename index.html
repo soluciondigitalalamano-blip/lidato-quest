@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=22;
+var REAL_V=23;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3416,6 +3416,7 @@ function applyReal(p){
   if((p.realData||0)<20) applyReal20(p);
   if((p.realData||0)<21) applyReal21(p);
   if((p.realData||0)<22) applyReal22(p);
+  if((p.realData||0)<23) applyReal23(p);
   p.realData=REAL_V;
   return true;
 }
@@ -4082,6 +4083,50 @@ function applyReal22(p){
     C[id]=sd;
   });
   if(window.console) console.info("[real v22]",log);
+}
+
+/* REAL v23 · sync Notion "Bitácora" (24-nov-2026, corrida diurna)
+   - INCOMELEC · 15 tareas nuevas de las actas Gemini del 21 y 24-nov (Tipo Tarea,
+     ID externo GEMINI-…), solo las que tienen responsable Lidato (sola o con José Félix).
+     Prioridad P2→Alta(1), P3→Media(2); vence solo si la Bitácora trae fecha.
+   - No se aplican (quedan para decisión del dueño): GEMINI-20261124-05 (la prepara Diana),
+     -06 (condicional), 20261121-08/-09 (cliente por confirmar), -13 (responsable José Félix),
+     -15 (responsable por asignar).
+   Aditiva e idempotente: no duplica por id ni por título (minúsculas); no toca tareas existentes.
+   Corre una sola vez (p.realData < 23). */
+var R23_TS=Date.UTC(2026,10,24,17,0,0);
+var R23_TASKS=[
+  {x:"GEMINI-20261124-01",title:"Revisar con Diana los pasos actuales de descarga de archivos",pri:2,due:"",notes:"Acta Gemini 24-nov. Diana integra a mano informes de Word Office con centros de costo y unidades de negocio; revisar si se automatiza con descarga de archivos o con la API de la otra aplicación. [Notion GEMINI-20261124-01]"},
+  {x:"GEMINI-20261124-02",title:"Integrar la descarga de archivos con la IA para eliminar carga manual",pri:2,due:"",notes:"Acta Gemini 24-nov. Conectar el proceso con la IA para automatizar la integración de los archivos de Diana (pedía Power BI para quitarse la carga manual en Excel). [Notion GEMINI-20261124-02]"},
+  {x:"GEMINI-20261124-03",title:"Ejecutar con Diana pruebas del flujo automatizado y su conexión con la IA",pri:2,due:"",notes:"Acta Gemini 24-nov. Verificar que la conexión entre el sistema de origen y la IA funcione. [Notion GEMINI-20261124-03]"},
+  {x:"GEMINI-20261124-04",title:"Otorgar permisos de modificación a la IA según el proceso propuesto",pri:2,due:"",notes:"Acta Gemini 24-nov (decisión). Rosa y don José aceptaron dar a Diana permisos puntuales para cambios en la IA; antes entender el flujo, porque el costeo alimenta el balance y el estado de resultados de cada unidad. [Notion GEMINI-20261124-04]"},
+  {x:"GEMINI-20261121-01",title:"Cargar información pendiente al tablero estratégico para el comité",pri:1,due:"2026-11-27",notes:"Acta Gemini 21-nov. Información consolidada el 27-nov; van 16 de 31 hitos. Comité de líderes el 3 o 4 de diciembre. [Notion GEMINI-20261121-01]"},
+  {x:"GEMINI-20261121-02",title:"Enviar a Sofía por correo la información faltante de indicadores del plan estratégico",pri:1,due:"",notes:"Acta Gemini 21-nov. Compromisos cerrados en fecha y métricas de productividad por IA (I+D+I). Alimenta el tablero del 27-nov. [Notion GEMINI-20261121-02]"},
+  {x:"GEMINI-20261121-03",title:"Presentar a Linda y Vanessa los reportes semanales y mensuales de soporte",pri:2,due:"",notes:"Acta Gemini 21-nov. Mostrar el detalle por cliente de los reportes de soporte. [Notion GEMINI-20261121-03]"},
+  {x:"GEMINI-20261121-04",title:"Coordinar con Tatiana la estructuración del área comercial y del CRM",pri:2,due:"",notes:"Acta Gemini 21-nov. Parte del plan estratégico; aún no se conoce el estado del CRM. [Notion GEMINI-20261121-04]"},
+  {x:"GEMINI-20261121-05",title:"Revisar en oficina con José Félix el agente IA de Microsoft Copilot",pri:1,due:"2026-11-25",notes:"Acta Gemini 21-nov. Sesión presencial mié 25-nov 8:00 a. m. en la oficina (con José Félix). [Notion GEMINI-20261121-05]"},
+  {x:"GEMINI-20261121-06",title:"Revisar con José Félix la configuración de agentes e información en Notion",pri:1,due:"2026-11-25",notes:"Acta Gemini 21-nov. Misma sesión del 25-nov 8:00 a. m.; definir dónde se centralizan las tareas (Notion vs Microsoft). [Notion GEMINI-20261121-06]"},
+  {x:"GEMINI-20261121-07",title:"Definir las próximas tareas del proyecto de inteligencia artificial",pri:1,due:"2026-11-25",notes:"Acta Gemini 21-nov (decisión). Sale de la sesión del 25-nov 8:00 a. m. con José Félix. [Notion GEMINI-20261121-07]"},
+  {x:"GEMINI-20261121-10",title:"Quitar la ISO 9001 del seguimiento 2026 del plan estratégico",pri:2,due:"",notes:"Acta Gemini 21-nov. La certificación pasó a marzo del próximo año. Conviene dejarlo listo antes del tablero del 27-nov. [Notion GEMINI-20261121-10]"},
+  {x:"GEMINI-20261121-11",title:"Ajustar el seguimiento de soporte al periodo enero–octubre",pri:2,due:"",notes:"Acta Gemini 21-nov. Indicador de soporte del plan estratégico (Vanessa y Linda): hoy va de enero a agosto. [Notion GEMINI-20261121-11]"},
+  {x:"GEMINI-20261121-12",title:"Corregir «recibos» por «recaudo» en el reporte de recaudo semanal",pri:2,due:"",notes:"Acta Gemini 21-nov. Error de etiqueta en la tabla por empresa que señaló José Félix. [Notion GEMINI-20261121-12]"},
+  {x:"GEMINI-20261121-14",title:"Diseñar informe visual de gastos de administración a partir del Excel base",pri:2,due:"",notes:"Acta Gemini 21-nov. Mismo enfoque que tesorería, en reemplazo del Power BI; solo datos, sin valoraciones de la IA. Depende del Excel que envía José Félix. [Notion GEMINI-20261121-14]"}
+];
+function applyReal23(p){
+  p.tasks=p.tasks||[]; var log=[];
+  var c=p.clients.filter(function(x){return x.id==="incomelec";})[0]||p.clients.filter(function(x){return /^i[nm]comelec/i.test(x.name||"");})[0];
+  if(!c) return;
+  var seenT={}, seenId={};
+  p.tasks.forEach(function(t){ seenT[String(t.title||"").toLowerCase()]=1; seenId[t.id]=1; });
+  R23_TASKS.forEach(function(T){
+    var id="t_gem_"+T.x;
+    if(seenId[id]||seenT[T.title.toLowerCase()]) return;
+    p.tasks.push({id:id,createdAt:Math.min(R23_TS,Date.now()),status:"todo",doneAt:null,hrs:0,
+      cid:c.id,pid:null,due:T.due,priority:T.pri,est:0,title:T.title,notes:T.notes,real:true});
+    seenId[id]=1; seenT[T.title.toLowerCase()]=1;
+    log.push(c.id+" · tarea · "+T.title);
+  });
+  if(window.console) console.info("[real v23]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
