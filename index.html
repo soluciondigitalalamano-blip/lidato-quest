@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=25;
+var REAL_V=26;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3432,6 +3432,7 @@ function applyReal(p){
   if((p.realData||0)<23) realStep(p,23,applyReal23);
   if((p.realData||0)<24) realStep(p,24,applyReal24);
   if((p.realData||0)<25) realStep(p,25,applyReal25);
+  if((p.realData||0)<26) realStep(p,26,applyReal26);
   p.realData=REAL_V;
   return true;
 }
@@ -4264,6 +4265,33 @@ function applyReal25(p){
     p.payments.push({id:X[4],createdAt:Date.now(),cid:c.id,amount:X[2],date:dt,period:X[1],kind:"recurrente",note:"Pago confirmado por el dueño (22-nov-2026)"});
     log.push("pago · "+c.id+" · "+X[1]); });
   if(window.console) console.info("[real v25]",log);
+}
+
+/* REAL v26 · sync Notion "Bitácora" (26-nov-2026, corrida diurna 15:00 Bogotá)
+   - INCOMELEC · INF-21 Informe Semanal de Soporte, semana del vie 27-nov: entregado el
+     26-nov, antes de la hora límite (confirmado por el dueño el 26-nov 12:57 p. m.;
+     Bitácora: 4 de 4, a tiempo).
+   - No se aplica (dato contradictorio en la Bitácora): INF-18 Tesorería del 26-nov
+     (Hecho 17 de 19, pero el detalle dice "faltan del 25 al 30-nov").
+   Aditiva e idempotente: solo marca lo que falta; no desmarca ni borra nada.
+   Corre una sola vez (p.realData < 26). */
+var R26_K="2026-11", R26_DUE="2026-11-27", R26_DAY="2026-11-26";
+function applyReal26(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; var log=[];
+  var c=(p.clients||[]).filter(function(x){return x&&x.id==="incomelec";})[0]||(p.clients||[]).filter(function(x){return x&&/^i[nm]comelec/i.test(x.name||"");})[0];
+  if(!c||!Array.isArray(c.reportItems)) return;
+  var C=p.cycles[R26_K]=p.cycles[R26_K]||{}, W=weeksInMonth(R26_K), t=Math.min(r7noon(R26_DAY),Date.now());
+  c.reportItems.forEach(function(it){
+    if(!it||it.id!=="INF-21"||it.cadence!=="weekly"||(it.until&&R26_K>it.until)) return;
+    var wi=-1, i; for(i=0;i<W;i++){ if(weekDue(R26_K,i+1,it.dow==null?5:it.dow)===R26_DUE){ wi=i; break; } }
+    if(wi<0) return;
+    var key="ri_"+it.id, id=c.id+"|"+key, st=C[id]||{priority:null,notes:"",hrs:0,slots:[]}, q=it.qty||1;
+    st.slots=st.slots||[]; while(st.slots.length<W) st.slots.push(0);
+    if((st.slots[wi]||0)<q){ st.slots[wi]=q; log.push(c.id+" · INF-21 · semana "+(wi+1)); }
+    for(var u=1;u<=q;u++){ var ref="w|"+R26_K+"|"+c.id+"|"+key+"|"+wi+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:t,late:false}; }
+    C[id]=st;
+  });
+  if(window.console) console.info("[real v26]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
