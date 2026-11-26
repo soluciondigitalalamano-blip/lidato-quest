@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=24;
+var REAL_V=25;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3347,9 +3347,22 @@ var REAL_DEALS=[
 ];
 /* Aplica los datos reales una sola vez. Idempotente: si p.realData ya está en
    REAL_V no toca nada, así una edición del dueño nunca se sobreescribe. */
+/* v25 · blindaje: cada paso de datos reales corre aislado. Si uno falla con los datos
+   guardados del dueño, se registra (p.realErr y aviso en pantalla) y los demás pasos
+   SÍ se aplican. Antes, un solo error cancelaba todos los pasos en cada carga. */
+var REAL_ERR=[];
+function realStep(p,n,fn){
+  try{ fn(p); }
+  catch(e){
+    var msg=String(e&&e.message||e).slice(0,200);
+    p.realErr=p.realErr||{}; p.realErr["v"+n]={msg:msg,at:Date.now()};
+    REAL_ERR.push("v"+n+": "+msg);
+    if(window.console) console.error("[real v"+n+"]",e);
+  }
+}
 function applyReal(p){
   if(p.realData>=REAL_V) return false;
-  if((p.realData||0)<3){
+  if((p.realData||0)<3) realStep(p,3,function(p){
   /* clientes */
   p.clients.forEach(function(c){
     var R=REAL_CLIENTS[c.id]; if(!R) return;
@@ -3396,28 +3409,29 @@ function applyReal(p){
       name:D.name,company:D.company,value:D.value,prob:null,
       type:D.type,cid:D.cid,nextDate:D.nextDate,next:D.next});
   });
-  }
-  if((p.realData||0)<4) applyReal4(p);
-  applyReal5(p);
-  applyReal6(p);
-  if((p.realData||0)<7) applyReal7(p);
-  if((p.realData||0)<8) applyReal8(p);
-  if((p.realData||0)<9) applyReal9(p);
-  if((p.realData||0)<10) applyReal10(p);
-  if((p.realData||0)<11) applyReal11(p);
-  if((p.realData||0)<12) applyReal12(p);
-  if((p.realData||0)<13) applyReal13(p);
-  if((p.realData||0)<14) applyReal14(p);
-  if((p.realData||0)<15) applyReal15(p);
-  if((p.realData||0)<16) applyReal16(p);
-  if((p.realData||0)<17) applyReal17(p);
-  if((p.realData||0)<18) applyReal18(p);
-  if((p.realData||0)<19) applyReal19(p);
-  if((p.realData||0)<20) applyReal20(p);
-  if((p.realData||0)<21) applyReal21(p);
-  if((p.realData||0)<22) applyReal22(p);
-  if((p.realData||0)<23) applyReal23(p);
-  if((p.realData||0)<24) applyReal24(p);
+  });
+  if((p.realData||0)<4) realStep(p,4,applyReal4);
+  realStep(p,5,applyReal5);
+  realStep(p,6,applyReal6);
+  if((p.realData||0)<7) realStep(p,7,applyReal7);
+  if((p.realData||0)<8) realStep(p,8,applyReal8);
+  if((p.realData||0)<9) realStep(p,9,applyReal9);
+  if((p.realData||0)<10) realStep(p,10,applyReal10);
+  if((p.realData||0)<11) realStep(p,11,applyReal11);
+  if((p.realData||0)<12) realStep(p,12,applyReal12);
+  if((p.realData||0)<13) realStep(p,13,applyReal13);
+  if((p.realData||0)<14) realStep(p,14,applyReal14);
+  if((p.realData||0)<15) realStep(p,15,applyReal15);
+  if((p.realData||0)<16) realStep(p,16,applyReal16);
+  if((p.realData||0)<17) realStep(p,17,applyReal17);
+  if((p.realData||0)<18) realStep(p,18,applyReal18);
+  if((p.realData||0)<19) realStep(p,19,applyReal19);
+  if((p.realData||0)<20) realStep(p,20,applyReal20);
+  if((p.realData||0)<21) realStep(p,21,applyReal21);
+  if((p.realData||0)<22) realStep(p,22,applyReal22);
+  if((p.realData||0)<23) realStep(p,23,applyReal23);
+  if((p.realData||0)<24) realStep(p,24,applyReal24);
+  if((p.realData||0)<25) realStep(p,25,applyReal25);
   p.realData=REAL_V;
   return true;
 }
@@ -4175,6 +4189,81 @@ function applyReal24(p){
     t.status="done"; t.doneAt=Math.min(R24_DONE_TS,Date.now()); log.push("sign_supply · tarea · "+t.title);
   });
   if(window.console) console.info("[real v24]",log);
+}
+
+/* REAL v25 · indicación del dueño (26-nov-2026, 08:00 Bogotá) + reparación
+   - INCOMELEC · INF-18 Tesorería del miércoles 25-nov: entregada a tiempo.
+   - INCOMELEC · semanales (Cartera, Facturación y Soporte): vencen los VIERNES a las
+     2:00 p. m. (antes martes). La de esta semana vence el vie 27-nov; queda pendiente.
+   - Reparación: si en el navegador del dueño algún paso anterior falló (antes un solo
+     error cancelaba todos), se reafirma lo ya confirmado: entregas de INCOMELEC y Andina
+     de octubre y noviembre hasta el 25-nov, semanales de Andina solo hasta octubre,
+     tarifas y pagos de oct–nov (INCOMELEC, Andina) y de oct (GYM Shop).
+   Aditiva e idempotente: solo marca lo que falta; no desmarca, no borra, no duplica
+   pagos (cid+periodo). Corre una sola vez (p.realData < 25). */
+var R25_CUT="2026-11-25", R25_KS=["2026-10","2026-11"], R25_NOV_TS="2026-11-22";
+var R25_PAYS=[["incomelec","2026-10",1500000,null,"pay_r12_incomelec_202610"],["incomelec","2026-11",1500000,null,"pay_r12_incomelec_202611"],
+  ["andina","2026-10",700000,null,"pay_r12_andina_202610"],["andina","2026-11",700000,null,"pay_r12_andina_202611"],
+  ["gymshop","2026-10",1000000,"2026-10-20","pay_r17_gymshop_202610"]];
+function applyReal25(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; p.payments=p.payments||[]; var log=[];
+  var hol=(p.settings&&p.settings.holidays)? holidaysCO(2026) : {};
+  function cl(id,re){ return (p.clients||[]).filter(function(x){return x&&x.id===id;})[0]||(p.clients||[]).filter(function(x){return x&&re.test(x.name||"");})[0]; }
+  var inc=cl("incomelec",/^i[nm]comelec/i), and=cl("andina",/andina/i), gym=cl("gymshop",/gym/i);
+  function items(c){ return (c&&Array.isArray(c.reportItems))? c.reportItems.filter(function(it){return it&&it.id;}) : []; }
+  /* 1 · INCOMELEC: semanales los viernes 2:00 p. m. */
+  items(inc).forEach(function(it){ if(it.cadence==="weekly"&&it.dow!==5){ it.dow=5; log.push("incomelec · "+it.id+" vence viernes"); } });
+  if(inc&&inc.reports&&inc.reports.weekly){ inc.reports.weekly.dow=5; inc.reports.weekly.time="2:00 pm"; }
+  /* 2 · Andina: semanales solo hasta octubre; Pequeñas pasa a mensual (decisión del 22-nov) */
+  items(and).forEach(function(it){
+    if(it.cadence==="weekly"&&!it.until){ it.until="2026-10"; log.push("andina · "+it.id+" semanal hasta oct"); }
+    if(it.cadence==="monthly"&&it.months){ delete it.months; it.label=String(it.label).replace(/\s*\(trimestral\)/i,""); log.push("andina · "+it.id+" mensual"); }
+  });
+  /* 3 · entregas a tiempo hasta el 25-nov (incluye la tesorería del 25-nov) */
+  function mark(c){ if(!c) return;
+    items(c).forEach(function(it){ var key="ri_"+it.id, id=c.id+"|"+key, q=it.qty||1;
+      R25_KS.forEach(function(k){
+        if(it.until&&k>it.until) return; var mo=+k.slice(5,7); if(it.months&&it.months.indexOf(mo)<0) return;
+        var C=p.cycles[k]=p.cycles[k]||{}, n=0, u;
+        if(it.cadence==="weekly"){
+          var W=weeksInMonth(k), st=C[id]||{priority:null,notes:"",hrs:0,slots:[]}; st.slots=st.slots||[];
+          while(st.slots.length<W) st.slots.push(0);
+          for(var i=0;i<W;i++){ var due=weekDue(k,i+1,it.dow==null?5:it.dow); if(due>R25_CUT) continue;
+            if((st.slots[i]||0)<q){ st.slots[i]=q; n++; }
+            for(u=1;u<=q;u++){ var r1="w|"+k+"|"+c.id+"|"+key+"|"+i+"|"+u; if(!p.ev[r1]) p.ev[r1]={t:Math.min(r7noon(due),Date.now()),late:false}; } }
+          C[id]=st;
+        } else if(it.cadence==="daily"){
+          var sd=C[id]||{priority:null,notes:"",hrs:0,d:{}}; sd.d=sd.d||{}; var last=daysInMonth(k);
+          for(var d=1; d<=last; d++){ var ds=k+"-"+(d<10?"0":"")+d; if(ds>R25_CUT) break;
+            var w=parseISO(ds).getDay(); if(w===0||w===6||hol[ds]) continue;
+            if(!sd.d[ds]){ sd.d[ds]=true; n++; }
+            for(u=1;u<=q;u++){ var r2="d|"+c.id+"|"+key+"|"+ds+"|"+u; if(!p.ev[r2]) p.ev[r2]={t:Math.min(r7noon(ds),Date.now()),late:false}; } }
+          C[id]=sd;
+        } else if(it.cadence==="monthly"){
+          var sm=C[id]||{priority:null,notes:"",hrs:0}, dm=sm.due||monthDue(k,it.dom||null);
+          if(!((+sm.count||0)>=q)){ sm.count=q; n++; } sm.due=dm; C[id]=sm;
+          var tm=Math.min(r7noon(k===R25_KS[0]?dm:R25_NOV_TS),Date.now());
+          for(u=1;u<=q;u++){ var r3="m|"+k+"|"+c.id+"|"+key+"|"+u; if(!p.ev[r3]) p.ev[r3]={t:tm,late:false}; }
+        }
+        if(n) log.push(c.id+" · "+it.id+" · "+k+" · "+n);
+      });
+    });
+    /* avance de implementación de octubre (venció el 31-oct): entregado a tiempo */
+    if(c.impl||c.implEnd){ var k0=R25_KS[0], C0=p.cycles[k0]=p.cycles[k0]||{}, im=C0[c.id+"|implement"]||{priority:null,notes:"",hrs:0}, d0=im.due||monthDue(k0,null);
+      if(!(im.count>=1)){ im.count=1; log.push(c.id+" · implementación · "+k0); } im.due=d0; C0[c.id+"|implement"]=im;
+      var r4="m|"+k0+"|"+c.id+"|implement|1"; if(!p.ev[r4]) p.ev[r4]={t:Math.min(r7noon(d0),Date.now()),late:false}; }
+  }
+  mark(inc); mark(and);
+  /* 4 · tarifas y pagos confirmados (no se duplican por cliente + periodo) */
+  [inc,and,gym].forEach(function(c){ if(!c) return; var R=REAL_CLIENTS[c.id]; if(!R) return;
+    if(R.fee!=null&&!(c.feeHist||[]).length){ c.feeHist=[{from:REAL_FEE_FROM,fee:R.fee}]; log.push(c.id+" · tarifa"); }
+    if(R.payDay!=null&&c.payDay==null) c.payDay=R.payDay; });
+  R25_PAYS.forEach(function(X){ var c=X[0]==="incomelec"?inc:X[0]==="andina"?and:gym; if(!c) return;
+    if(p.payments.some(function(y){return y&&y.cid===c.id&&y.period===X[1];})) return;
+    var dt=X[3]||monthDue(X[1],c.payDay||15);
+    p.payments.push({id:X[4],createdAt:Date.now(),cid:c.id,amount:X[2],date:dt,period:X[1],kind:"recurrente",note:"Pago confirmado por el dueño (22-nov-2026)"});
+    log.push("pago · "+c.id+" · "+X[1]); });
+  if(window.console) console.info("[real v25]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
@@ -5265,7 +5354,7 @@ window.LQ = {
   SCHEMA:SCHEMA, validISO:validISO, clamp:clamp, quarterOf:quarterOf, qRange:qRange, shiftQ:shiftQ, ensureClient:ensureClient,
   feeAt:feeAt, feeNow:feeNow, feeSince:feeSince, trackSince:trackSince, activeAt:activeAt, isRecurring:isRecurring, mrrRows:mrrRows, mrrAt:mrrAt, setClientStatus:setClientStatus,
   setFee:setFee, deleteFeeAt:deleteFeeAt, isDemo:isDemo, bizClients:bizClients, NEEDS_BILLING:NEEDS_BILLING,
-  recovered:function(){ return RECOVERED; }, sanitize:sanitize,
+  recovered:function(){ return RECOVERED; }, realErrors:function(){ return REAL_ERR.slice(); }, sanitize:sanitize,
   payment:payment, payDue:payDue, payOnTime:payOnTime, savePayment:savePayment, deletePayment:deletePayment, restorePayment:restorePayment,
   STAGES:STAGES, stage:stage, deal:deal, saveDeal:saveDeal, setDealStage:setDealStage, deleteDeal:deleteDeal, restoreDeal:restoreDeal, dealOpen:dealOpen,
   timeEntry:timeEntry, saveTime:saveTime, deleteTime:deleteTime, restoreTime:restoreTime, timeOf:timeOf,
@@ -7585,6 +7674,11 @@ function boot(){
     U.toast(rec.dropped&&rec.dropped.length
       ? "Tus datos guardados estaban dañados. Se recuperó lo posible y se descartaron: "+rec.dropped.join(", ")+". El archivo original quedó guardado aparte."
       : "Tus datos guardados tenían un problema de formato y se repararon al abrir.","bad",
+      {label:"Descargar respaldo",fn:function(){ V.exportJSON(); }});
+  }
+  var rerr=L.realErrors&&L.realErrors();
+  if(rerr&&rerr.length){
+    U.toast("Algunos datos reales no se pudieron aplicar y el resto sí se aplicó. Envía este detalle a soporte: "+rerr.join(" · "),"bad",
       {label:"Descargar respaldo",fn:function(){ V.exportJSON(); }});
   }
   if(L.FRESH){
