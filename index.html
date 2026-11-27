@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=26;
+var REAL_V=27;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3433,6 +3433,7 @@ function applyReal(p){
   if((p.realData||0)<24) realStep(p,24,applyReal24);
   if((p.realData||0)<25) realStep(p,25,applyReal25);
   if((p.realData||0)<26) realStep(p,26,applyReal26);
+  if((p.realData||0)<27) realStep(p,27,applyReal27);
   p.realData=REAL_V;
   return true;
 }
@@ -4292,6 +4293,59 @@ function applyReal26(p){
     C[id]=st;
   });
   if(window.console) console.info("[real v26]",log);
+}
+
+/* REAL v27 · sync Notion "Bitácora" (27-nov-2026, corrida diurna 15:00 Bogotá)
+   - INCOMELEC · INF-20 Informe Semanal de Facturación, semana del vie 27-nov: entregado
+     el 27-nov 12:05 p. m., antes de la hora límite de 2:00 p. m. (Bitácora: 4 de 4, a tiempo).
+   - Shalom · SOP-05, SOP-06, SOP-07 y SOP-08: resueltos (Bitácora "Completado", confirmado
+     por el dueño el 27-nov-2026 12:53 p. m.; la fecha real de resolución no está registrada,
+     se usa la de la confirmación).
+   - INCOMELEC · tarea nueva "Responder a INCOMELEC los datos tributarios de ICA (Acuerdo 976
+     de 2026)", prioridad Alta (Bitácora N.º 238, reportada por el dueño el 27-nov).
+   - No se aplica (dato contradictorio en la Bitácora): INF-18 Tesorería del 26 y 27-nov
+     (Hecho 18 de 19, pero el detalle dice "faltan los días hábiles del 25 al 30-nov").
+   Aditiva e idempotente: solo marca lo que falta; no desmarca ni borra nada.
+   Corre una sola vez (p.realData < 27). */
+var R27_K="2026-11", R27_DUE="2026-11-27", R27_DELIV=Date.UTC(2026,10,27,17,5,0),
+    R27_SOP_AT=Date.UTC(2026,10,27,17,53,0), R27_TASK_AT=Date.UTC(2026,10,27,17,57,0),
+    R27_SOPS=["SOP-05","SOP-06","SOP-07","SOP-08"];
+var R27_TASK={id:"t_bit238",title:"Responder a INCOMELEC los datos tributarios de ICA (Acuerdo 976 de 2026)",pri:1,due:"",
+  notes:"Administrativo / bloquea pago. Correo de Facturación Electrónica Proveedores de INCOMELEC (13-nov-2026): confirmar 1) código CIIU principal y secundario con el que facturamos; 2) nueva tarifa de ICA; 3) periodicidad del ICA (bimestral o anual); 4) condición tributaria especial en Bogotá (exención, beneficio o autorretenedor). Sin respuesta al 27-nov. [Notion Bitácora N.º 238]"};
+function applyReal27(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; p.tickets=p.tickets||[]; p.tasks=p.tasks||[]; var log=[];
+  var c=(p.clients||[]).filter(function(x){return x&&x.id==="incomelec";})[0]||(p.clients||[]).filter(function(x){return x&&/^i[nm]comelec/i.test(x.name||"");})[0];
+  /* 1 · INCOMELEC INF-20, semana del 27-nov */
+  if(c&&Array.isArray(c.reportItems)){
+    var C=p.cycles[R27_K]=p.cycles[R27_K]||{}, W=weeksInMonth(R27_K), t=Math.min(R27_DELIV,Date.now());
+    c.reportItems.forEach(function(it){
+      if(!it||it.id!=="INF-20"||it.cadence!=="weekly"||(it.until&&R27_K>it.until)) return;
+      var wi=-1, i; for(i=0;i<W;i++){ if(weekDue(R27_K,i+1,it.dow==null?5:it.dow)===R27_DUE){ wi=i; break; } }
+      if(wi<0) return;
+      var key="ri_"+it.id, id=c.id+"|"+key, st=C[id]||{priority:null,notes:"",hrs:0,slots:[]}, q=it.qty||1;
+      st.slots=st.slots||[]; while(st.slots.length<W) st.slots.push(0);
+      if((st.slots[wi]||0)<q){ st.slots[wi]=q; log.push(c.id+" · INF-20 · semana "+(wi+1)); }
+      for(var u=1;u<=q;u++){ var ref="w|"+R27_K+"|"+c.id+"|"+key+"|"+wi+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:t,late:false}; }
+      C[id]=st;
+    });
+  }
+  /* 2 · Shalom SOP-05 a SOP-08 resueltos */
+  p.tickets.forEach(function(k){
+    if(!k||R27_SOPS.indexOf(String(k.id).replace(/^x_/,""))<0||k.id.indexOf("x_")!==0||k.status==="resuelto") return;
+    k.status="resuelto"; k.resolvedAt=Math.min(R27_SOP_AT,Date.now());
+    if(!String(k.resolution||"").trim()) k.resolution="Completado según la Bitácora de Notion (confirmado por el dueño el 27-nov-2026; fecha real de resolución sin dato).";
+    log.push("ticket resuelto · "+k.id.slice(2)+" · "+k.subject);
+  });
+  /* 3 · tarea nueva de INCOMELEC (no duplica por id ni por título) */
+  if(c){
+    var dup=p.tasks.some(function(x){ return x&&(x.id===R27_TASK.id||String(x.title||"").toLowerCase()===R27_TASK.title.toLowerCase()); });
+    if(!dup){
+      p.tasks.push({id:R27_TASK.id,createdAt:Math.min(R27_TASK_AT,Date.now()),status:"todo",doneAt:null,hrs:0,
+        cid:c.id,pid:null,due:R27_TASK.due,priority:R27_TASK.pri,est:0,title:R27_TASK.title,notes:R27_TASK.notes,real:true});
+      log.push(c.id+" · tarea · "+R27_TASK.title);
+    }
+  }
+  if(window.console) console.info("[real v27]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
