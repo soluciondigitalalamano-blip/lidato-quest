@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=27;
+var REAL_V=28;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3434,6 +3434,7 @@ function applyReal(p){
   if((p.realData||0)<25) realStep(p,25,applyReal25);
   if((p.realData||0)<26) realStep(p,26,applyReal26);
   if((p.realData||0)<27) realStep(p,27,applyReal27);
+  if((p.realData||0)<28) realStep(p,28,applyReal28);
   p.realData=REAL_V;
   return true;
 }
@@ -4346,6 +4347,81 @@ function applyReal27(p){
     }
   }
   if(window.console) console.info("[real v27]",log);
+}
+
+/* REAL v28 · sync Notion "Bitácora" (27-nov-2026, corrida de cierre 18:30 Bogotá)
+   - GYM Shop · semanales INF-07, INF-08, INF-10, INF-11, INF-15 e INF-17, semana 4 (sáb 28-nov):
+     entregados el vie 27-nov, antes del cierre del sáb 28 10:00 a. m. (confirmado por el dueño
+     el 27-nov 4:51 p. m.; Bitácora 4 de 4, "Entregado a tiempo").
+   - INCOMELEC · INF-19 Informe Semanal de Cartera, semana del vie 27-nov: entregado el 27-nov
+     (Bitácora 4 de 4, "Entregado a tiempo"). La hora exacta no está registrada: se usa la hora
+     límite (2:00 p. m.).
+   - Sign Supply · 10 tareas del acta Gemini del 27-nov 4:58 p. m. con responsable Miguel/Lidato
+     (Bitácora N.º 241-243, 245-250, 253). No se aplican las de responsable "por asignar" o solo
+     del cliente (N.º 244, 251, 252).
+   - Andina · tarea "Acusar recibo a Andina del nuevo calendario de radicación y pagos" (N.º 256).
+   - No se aplica: INCOMELEC "Informe Semanal de Proyectos" (sin INF-id utilizable; decisión del dueño).
+   Aditiva e idempotente: solo marca lo que falta; no desmarca, no borra, no duplica tareas
+   (por id ni por título). Corre una sola vez (p.realData < 28). */
+var R28_K="2026-11", R28_GYM_WI=3, R28_GYM_AT=Date.UTC(2026,10,27,21,51,0),
+    R28_INC_DUE="2026-11-27", R28_INC_AT=Date.UTC(2026,10,27,19,0,0),
+    R28_GYM_WEEKLY=["INF-07","INF-08","INF-10","INF-11","INF-15","INF-17"],
+    R28_SS_AT=Date.UTC(2026,10,27,22,34,0), R28_AND_AT=Date.UTC(2026,10,27,22,38,0);
+var R28_TASKS=[
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-01",title:"Actualizar la base de datos mensual de ventas este fin de semana",pri:1,due:"2026-11-30",notes:"Acta Gemini 27-nov (Sign Supply). Cambio de mes con presupuesto basado en ventas del año anterior completo; el equipo debe verlo al llegar el lunes 30. [Notion GEMINI-20261127-1658-01]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-02",title:"Elaborar guía de usuario del nuevo funcionamiento de la base para el equipo",pri:1,due:"2026-11-30",notes:"Acta Gemini 27-nov (Sign Supply). El cambio de este mes es grande; la guía evita confusión cuando el equipo entre el lunes. [Notion GEMINI-20261127-1658-02]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-03",title:"Enviar a financiera adm la última propuesta enviada a Don Jaime",pri:1,due:"",notes:"Acta Gemini 27-nov (Sign Supply). Bloquea la estructuración del contrato de informes que Don Jaime aprobó (qué queda incluido y qué no). [Notion GEMINI-20261127-1658-03]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-05",title:"Automatizar la actualización diaria de ventas desde el correo",pri:2,due:"",notes:"Acta Gemini 27-nov (Sign Supply). Que el archivo de ventas que llega por correo actualice solo la base y los reportes. [Notion GEMINI-20261127-1658-05]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-06",title:"Crear plantillas de los informes periódicos de ventas (gerencia, líderes, equipo, Excel)",pri:2,due:"",notes:"Acta Gemini 27-nov (Sign Supply). Don Jaime aprobó: gerencia (formal), uno por líder/línea, Excel con presupuesto, y equipo lunes y jueves; arrancan en diciembre. [Notion GEMINI-20261127-1658-06]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-07",title:"Elaborar el informe de cierre de noviembre para la presentación del viernes",pri:2,due:"2026-12-04",notes:"Acta Gemini 27-nov (Sign Supply). Primer informe bajo la propuesta aprobada por Don Jaime; incluye gestión comercial de los últimos meses. [Notion GEMINI-20261127-1658-07]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-08",title:"Incluir análisis de recuperación de cartera y clientes recuperados en la presentación",pri:2,due:"2026-12-04",notes:"Acta Gemini 27-nov (Sign Supply). Recuperación por edades y clientes recuperados. Periodo ambiguo en el acta (junio–noviembre o agosto–noviembre). [Notion GEMINI-20261127-1658-08]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-09",title:"Organizar las listas de clientes de Vitex unificadas por zonas",pri:2,due:"",notes:"Acta Gemini 27-nov (Sign Supply, decisión). Por cambio de personal en ventas ya no se separan por vendedor. [Notion GEMINI-20261127-1658-09]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-10",title:"Revisar con financiera adm los cambios de la base el martes",pri:2,due:"2026-12-01",notes:"Acta Gemini 27-nov (Sign Supply). Se movió del lunes al martes porque el lunes es cierre contable. [Notion GEMINI-20261127-1658-10]"},
+  {cid:"sign_supply",re:/sign/i,x:"GEMINI-20261127-1658-13",title:"Configurar automatización del dashboard de cartera en el equipo de financiera adm",pri:2,due:"",notes:"Acta Gemini 27-nov (Sign Supply). Replicar la actualización automática por correo con el Excel semanal de cartera que envía Daniel; falta agendar sesión en su PC. [Notion GEMINI-20261127-1658-13]"},
+  {cid:"andina",re:/andina/i,x:"bit256",title:"Acusar recibo a Andina del nuevo calendario de radicación y pagos",pri:2,due:"",notes:"Administrativo. Circular de Andina a proveedores (10-nov-2026): radicación de facturas hasta el día 20 (o día hábil anterior) y pagos el día 25. Piden acusar recibo. [Notion Bitácora N.º 256]"}
+];
+function applyReal28(p){
+  p.cycles=p.cycles||{}; p.ev=p.ev||{}; p.tasks=p.tasks||[]; var log=[];
+  function cl(id,re){ return (p.clients||[]).filter(function(x){return x&&x.id===id;})[0]||(p.clients||[]).filter(function(x){return x&&re.test(x.name||"");})[0]; }
+  var C=p.cycles[R28_K]=p.cycles[R28_K]||{}, W=weeksInMonth(R28_K);
+  function markWeek(c,it,wi,t){
+    var key="ri_"+it.id, id=c.id+"|"+key, st=C[id]||{priority:null,notes:"",hrs:0,slots:[]}, q=it.qty||1;
+    st.slots=st.slots||[]; while(st.slots.length<W) st.slots.push(0);
+    if((st.slots[wi]||0)<q){ st.slots[wi]=q; log.push(c.id+" · "+it.id+" · semana "+(wi+1)); }
+    for(var u=1;u<=q;u++){ var ref="w|"+R28_K+"|"+c.id+"|"+key+"|"+wi+"|"+u; if(!p.ev[ref]) p.ev[ref]={t:t,late:false}; }
+    C[id]=st;
+  }
+  /* 1 · GYM Shop: semanales, semana 4 (sáb 28-nov), a tiempo */
+  var g=cl("gymshop",/gym/i);
+  if(g&&Array.isArray(g.reportItems)&&R28_GYM_WI<W){
+    g.reportItems.forEach(function(it){
+      if(!it||it.cadence!=="weekly"||R28_GYM_WEEKLY.indexOf(it.id)<0||(it.until&&R28_K>it.until)) return;
+      markWeek(g,it,R28_GYM_WI,Math.min(R28_GYM_AT,Date.now()));
+    });
+  }
+  /* 2 · INCOMELEC INF-19 Cartera, semana del 27-nov, a tiempo */
+  var c=cl("incomelec",/^i[nm]comelec/i);
+  if(c&&Array.isArray(c.reportItems)){
+    c.reportItems.forEach(function(it){
+      if(!it||it.id!=="INF-19"||it.cadence!=="weekly"||(it.until&&R28_K>it.until)) return;
+      var wi=-1, i; for(i=0;i<W;i++){ if(weekDue(R28_K,i+1,it.dow==null?5:it.dow)===R28_INC_DUE){ wi=i; break; } }
+      if(wi<0) return;
+      markWeek(c,it,wi,Math.min(R28_INC_AT,Date.now()));
+    });
+  }
+  /* 3 · tareas nuevas (no duplica por id ni por título) */
+  var seenT={}, seenId={};
+  p.tasks.forEach(function(t){ if(!t) return; seenT[String(t.title||"").toLowerCase()]=1; seenId[t.id]=1; });
+  R28_TASKS.forEach(function(T){
+    var k=cl(T.cid,T.re); if(!k) return;
+    var id=(T.x.indexOf("GEMINI")===0)?"t_gem_"+T.x:"t_"+T.x;
+    if(seenId[id]||seenT[T.title.toLowerCase()]) return;
+    p.tasks.push({id:id,createdAt:Math.min(k.id==="andina"?R28_AND_AT:R28_SS_AT,Date.now()),status:"todo",doneAt:null,hrs:0,
+      cid:k.id,pid:null,due:T.due,priority:T.pri,est:0,title:T.title,notes:T.notes,real:true});
+    seenId[id]=1; seenT[T.title.toLowerCase()]=1;
+    log.push(k.id+" · tarea · "+T.title);
+  });
+  if(window.console) console.info("[real v28]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
