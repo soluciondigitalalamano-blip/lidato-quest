@@ -3298,7 +3298,7 @@ var NEEDS_BILLING=[];
    el día cero del arranque. El Excel dejó "Tarifa desde" en blanco; antes de
    esa fecha el MRR queda en null en lugar de inventar historia.
    =========================================================================== */
-var REAL_V=28;
+var REAL_V=29;
 var REAL_FEE_FROM="2026-10-01";
 var REAL_CLIENTS={
   incomelec:   {billing:"recurrente", fee:1500000, payDay:15, adoption:80},
@@ -3435,6 +3435,7 @@ function applyReal(p){
   if((p.realData||0)<26) realStep(p,26,applyReal26);
   if((p.realData||0)<27) realStep(p,27,applyReal27);
   if((p.realData||0)<28) realStep(p,28,applyReal28);
+  if((p.realData||0)<29) realStep(p,29,applyReal29);
   p.realData=REAL_V;
   return true;
 }
@@ -4422,6 +4423,52 @@ function applyReal28(p){
     log.push(k.id+" · tarea · "+T.title);
   });
   if(window.console) console.info("[real v28]",log);
+}
+
+/* REAL v29 · sync Notion "Bitácora" (28-nov-2026, corrida diurna)
+   - GYM Shop · pago recurrente de noviembre recibido a tiempo (2026-11-20, $1.000.000).
+     Confirmado por el dueño el 27-nov (Bitácora N.º 264). El valor se copió del ciclo de
+     octubre: queda anotado como pendiente de confirmar si cambió.
+   - Andina · 5 tareas nuevas pedidas por el dueño el 27-nov (Bitácora N.º 265-269): 4 del área
+     Sistemas (vencen 23-dic) y "Pruebas de automatización" (vence mar 1-dic). Sin prioridad en
+     Notion: quedan sin prioridad.
+   - No se aplica: filas "Director ·" y "OPS-ESC" creadas por agentes.
+   Aditiva e idempotente: no duplica pagos (cliente + periodo) ni tareas (por id ni por título).
+   Corre una sola vez (p.realData < 29). */
+var R29_PAY={cid:"gymshop",re:/gym/i,period:"2026-11",amount:1000000,date:"2026-11-20",id:"pay_r29_gymshop_202611",
+    note:"Pago confirmado por el dueño (27-nov-2026). Valor igual al de octubre: confirmar si cambió. [Notion Bitácora N.º 264]"},
+    R29_AND_AT=Date.UTC(2026,10,28,3,33,55);
+var R29_TASKS=[
+  {x:"bit265",title:"Revisión de la nueva plantilla de informes (área Sistemas)",due:"2026-12-23",notes:"Área Sistemas. Solicitada por el dueño el 27-nov-2026. [Notion Bitácora N.º 265]"},
+  {x:"bit266",title:"HARD Sistema 2027 funcionando (área Sistemas)",due:"2026-12-23",notes:"Área Sistemas. Solicitada por el dueño el 27-nov-2026. Nombre tomado del dictado: confirmar si es \"HARD Sistema 2027\". [Notion Bitácora N.º 266]"},
+  {x:"bit267",title:"Cambio de los portales de informes (área Sistemas)",due:"2026-12-23",notes:"Área Sistemas. Solicitada por el dueño el 27-nov-2026. [Notion Bitácora N.º 267]"},
+  {x:"bit268",title:"Informes en Notion para todas las empresas (área Sistemas)",due:"2026-12-23",notes:"Área Sistemas. Solicitada por el dueño el 27-nov-2026. Cubre todas las empresas de Andina. [Notion Bitácora N.º 268]"},
+  {x:"bit269",title:"Pruebas de automatización",due:"2026-12-01",notes:"Solicitada por el dueño el 27-nov-2026. Entrega: martes 1-dic-2026. [Notion Bitácora N.º 269]"}
+];
+function applyReal29(p){
+  p.payments=p.payments||[]; p.tasks=p.tasks||[]; var log=[];
+  function cl(id,re){ return (p.clients||[]).filter(function(x){return x&&x.id===id;})[0]||(p.clients||[]).filter(function(x){return x&&re.test(x.name||"");})[0]; }
+  /* 1 · pago de noviembre de GYM Shop */
+  var g=cl(R29_PAY.cid,R29_PAY.re);
+  if(g&&!p.payments.some(function(y){return y&&(y.id===R29_PAY.id||(y.cid===g.id&&y.period===R29_PAY.period));})){
+    p.payments.push({id:R29_PAY.id,createdAt:Date.now(),cid:g.id,amount:R29_PAY.amount,date:R29_PAY.date,period:R29_PAY.period,kind:"recurrente",note:R29_PAY.note});
+    log.push("pago · "+g.id+" · "+R29_PAY.period);
+  }
+  /* 2 · tareas nuevas de Andina (no duplica por id ni por título) */
+  var a=cl("andina",/andina/i);
+  if(a){
+    var seenT={}, seenId={};
+    p.tasks.forEach(function(t){ if(!t) return; seenT[String(t.title||"").toLowerCase()]=1; seenId[t.id]=1; });
+    R29_TASKS.forEach(function(T){
+      var id="t_"+T.x;
+      if(seenId[id]||seenT[T.title.toLowerCase()]) return;
+      p.tasks.push({id:id,createdAt:Math.min(R29_AND_AT,Date.now()),status:"todo",doneAt:null,hrs:0,
+        cid:a.id,pid:null,due:T.due,priority:null,est:0,title:T.title,notes:T.notes,real:true});
+      seenId[id]=1; seenT[T.title.toLowerCase()]=1;
+      log.push(a.id+" · tarea · "+T.title);
+    });
+  }
+  if(window.console) console.info("[real v29]",log);
 }
 
 var DB=null, REV=0, saveTimer=null, storageErr=false;
